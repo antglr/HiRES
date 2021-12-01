@@ -1,3 +1,21 @@
+import numpy as np
+
+
+def windows_preprocessing(time_series, target_time_series, past_history_factor, forecast_horizon):
+    x, y = [], []
+    for j in range(past_history_factor, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
+        indices = list(range(j - past_history_factor, j))
+
+        window_ts = []
+        for i in range(time_series.shape[0]):
+            window_ts.append(time_series[i, indices])
+        window = np.array(window_ts)
+
+        x.append(window)
+        y.append(target_time_series[j: j + forecast_horizon])
+    return np.array(x), np.array(y)
+
+
 def normalize(data, norm_params, method="zscore"):
     """
     Normalize time series
@@ -59,3 +77,22 @@ def get_normalization_params(data):
     norm_params["min"] = d.min()
 
     return norm_params
+
+
+def normalize_dataset(train, test, normalization_method, dtype="float32"):
+    # Normalize train data
+    norm_params = []
+    for i in range(train.shape[0]):
+        nparams = get_normalization_params(train[i])
+        train[i] = normalize(
+            np.array(train[i], dtype=dtype), nparams, method=normalization_method
+        )
+        norm_params.append(nparams)
+
+    # Normalize test data
+    test = np.array(test, dtype=dtype)
+    for i in range(test.shape[0]):
+        nparams = norm_params[i]
+        test[i] = normalize(test[i], nparams, method=normalization_method)
+
+    return train, test, norm_params

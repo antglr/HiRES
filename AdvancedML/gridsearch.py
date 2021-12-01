@@ -85,9 +85,9 @@ TRAIN_ML = {
 
 
 ## Loading Files 
-cam = np.load("Camera.npy")
-phs = np.load("OL_Phase.npy")
-amp = np.load("OL_Magnitude.npy")
+cam = np.load("data/Camera.npy")
+phs = np.load("data/OL_Phase.npy")
+amp = np.load("data/OL_Magnitude.npy")
 
 ##SplittingRatio ML 
 percentage = 80 #-- Train

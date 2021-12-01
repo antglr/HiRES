@@ -212,6 +212,7 @@ def lr(params):
     fit_intercept = params
     
     model = LinearRegression(n_jobs=-1, fit_intercept=fit_intercept)
+    return model
 
 
 def create_rnn(func):

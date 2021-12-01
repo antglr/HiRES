@@ -1,4 +1,48 @@
 import numpy as np
+import copy
+def read_data(normalization_method, past_history_factor):
+    ## Loading Files 
+    cam = np.load("../data/Camera.npy")
+    phs = np.load("../data/OL_Phase.npy")
+    amp = np.load("../data/OL_Magnitude.npy")
+
+    ##SplittingRatio ML 
+    percentage = 80 #-- Train
+    split = int(np.shape(cam)[0]*percentage/100)
+    forecast_horizon = 1
+    
+    cam_train, cam_test = cam[:split], cam[split:]
+    phs_train, phs_test = phs[:split], phs[split:]
+    amp_train, amp_test = amp[:split], amp[split:]
+    
+    train = np.array([cam_train, phs_train, amp_train])
+    test = np.array([cam_test, phs_test, amp_test])
+    index_target_series = 0     # The index of cam_train, the target variable
+
+    train, test, norm_params = normalize_dataset(
+        train, test, normalization_method, dtype="float64"
+    )
+    
+    X_train, Y_train = windows_preprocessing(train, train[index_target_series], past_history_factor, forecast_horizon)
+    X_test, Y_test = windows_preprocessing(test, test[index_target_series], past_history_factor, forecast_horizon)
+    
+    print("TRAINING DATA")
+    print("Input shape", X_train.shape)
+    print("Output_shape", Y_train.shape)
+    print("TEST DATA")
+    print("Input shape", X_test.shape)
+    print("Output_shape", Y_test.shape)
+    
+    Y_train_denorm = copy.deepcopy(Y_train)
+    for i in range(Y_train.shape[0]):
+        Y_train_denorm[i] = denormalize(Y_train[i], norm_params[index_target_series], method=normalization_method)
+        
+    Y_test_denorm = copy.deepcopy(Y_test)
+    for i in range(Y_test.shape[0]):
+        Y_test_denorm[i] = denormalize(Y_test[i], norm_params[index_target_series], method=normalization_method)
+    
+    return X_train, Y_train, X_test, Y_test, Y_train_denorm, Y_test_denorm, norm_params, index_target_series
+
 
 
 def windows_preprocessing(time_series, target_time_series, past_history_factor, forecast_horizon):
@@ -24,7 +68,7 @@ def normalize(data, norm_params, method="zscore"):
     :param method: zscore or minmax
     :return: normalized time series
     """
-    assert method in ["zscore", "minmax", None]
+    assert method in ["zscore", "minmax", "None"]
 
     if method == "zscore":
         std = norm_params["std"]
@@ -39,7 +83,7 @@ def normalize(data, norm_params, method="zscore"):
             denominator = 1e-10
         return (data - norm_params["min"]) / denominator
 
-    elif method is None:
+    elif method == "None":
         return data
 
 
@@ -51,7 +95,7 @@ def denormalize(data, norm_params, method="zscore"):
     :param method: zscore or minmax
     :return: time series in original scale
     """
-    assert method in ["zscore", "minmax", None]
+    assert method in ["zscore", "minmax", "None"]
 
     if method == "zscore":
         return (data * norm_params["std"]) + norm_params["mean"]
@@ -59,7 +103,7 @@ def denormalize(data, norm_params, method="zscore"):
     elif method == "minmax":
         return data * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
 
-    elif method is None:
+    elif method == "None":
         return data
 
 

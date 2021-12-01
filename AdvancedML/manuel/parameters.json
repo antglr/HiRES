@@ -1,19 +1,19 @@
 {
     "normalization_method": ["None", "minmax", "zscore"],
-    "past_history_factor": [15, 30, 60, 100, 120],
+    "past_history_factor": [15, 30, 60, 90, 120],
     "batch_size": [32, 64],
-    "epochs": [5, 10],
+    "epochs": [5, 20],
     "max_steps_per_epoch": [10000],
     "learning_rate": [0.001, 0.01],
     "model_params": {
         "mlp": {
             "hidden_layers": [
-                [8]
+                [32, 16, 8]
             ]
         },
         "lstm": {
-            "layers": [1, 2, 4],
-            "units": [32, 64, 128],
+            "layers": [1, 2],
+            "units": [32],
             "return_sequence": [true, false]
         },
         "cnn": {
@@ -23,18 +23,18 @@
         },
         "tree":{
             "splitter" : ["best","random"],
-            "max_depth" : [2, 4, 6, 8, 10],
-            "min_samples_split" : [2, 4, 6, 8],
-            "min_samples_leaf": [1, 3, 5, 7]
+            "max_depth" : [2, 8],
+            "min_samples_split" : [2, 6],
+            "min_samples_leaf": [3, 7]
         },
         "rf" : {
-            "n_stimators" : [100, 300, 600],
-            "max_depth" : [2, 4, 6, 8, 10],
-            "min_samples_split" : [2, 4, 6, 8],
-            "min_samples_leaf": [1, 3, 5, 7]
+            "n_stimators" : [100],
+            "max_depth" : [2, 6],
+            "min_samples_split" : [2, 6],
+            "min_samples_leaf": [3, 7]
         },
         "lr": {
-            "fit_intercept": [true, false]
+            "fit_intercept": [true]
         }
     }
 }

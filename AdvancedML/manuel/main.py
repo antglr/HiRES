@@ -8,98 +8,9 @@ from multiprocessing import Process, Manager
 import numpy as np
 import pandas as pd
 from metrics import METRICS, evaluate
-from preprocessing import denormalize, windows_preprocessing
+from preprocessing import read_data, denormalize, windows_preprocessing
 from main_ml import main_ml
-
-
-
-def check_params(models, results_path, parameters, metrics, csv_filename):
-    assert all(
-        param in parameters.keys()
-        for param in [
-            "normalization_method",
-            "past_history_factor",
-            "batch_size",
-            "epochs",
-            "max_steps_per_epoch",
-            "learning_rate",
-            "model_params",
-        ]
-    ), "Some parameters are missing in the parameters file."
-    assert all(
-        model in parameters["model_params"] for model in models
-    ), "models parameter is not well defined."
-    assert metrics is None or all(m in METRICS.keys() for m in metrics)
-
-
-def read_results_file(csv_filepath, metrics):
-    try:
-        results = pd.read_csv(csv_filepath, sep=";", index_col=0)
-    except IOError:
-        results = pd.DataFrame(
-            columns=[
-                "MODEL",
-                "MODEL_INDEX",
-                "MODEL_DESCRIPTION",
-                "FORECAST_HORIZON",
-                "PAST_HISTORY_FACTOR",
-                "PAST_HISTORY",
-                "BATCH_SIZE",
-                "EPOCHS",
-                "STEPS",
-                "OPTIMIZER",
-                "LEARNING_RATE",
-                "NORMALIZATION",
-                "TEST_TIME",
-                "TRAINING_TIME",
-                *metrics,
-                "LOSS",
-                "VAL_LOSS",
-            ]
-        )
-    return results
-
-
-def product(**kwargs):
-    keys = kwargs.keys()
-    vals = kwargs.values()
-    for instance in itertools.product(*vals):
-        yield dict(zip(keys, instance))
-
-
-def read_data(normalization_method, past_hisotry_factor):
-    ## Loading Files 
-    cam = np.load("data/Camera.npy")
-    phs = np.load("data/OL_Phase.npy")
-    amp = np.load("data/OL_Magnitude.npy")
-
-    ##SplittingRatio ML 
-    percentage = 80 #-- Train
-    split = int(np.shape(cam)[0]*percentage/100)
-    forecast_horizon = 1
-    
-    cam_train, cam_test = cam[:split], cam[split:]
-    phs_train, phs_test = phs[:split], phs[split:]
-    amp_train, amp_test = amp[:split], amp[split:]
-    
-    train = np.array([phs_train, amp_train, cam_train])
-    test = np.array([phs_test, amp_test, cam_test])
-    
-    
-    # TODO: Normalize
-    
-    X_train, Y_train = windows_preprocessing(train, cam_train, past_history_factor, forecast_horizon)
-    X_test, Y_test = windows_preprocessing(test, cam_test, past_history_factor, forecast_horizon)
-    
-    print("TRAINING DATA")
-    print("Input shape", x_train.shape)
-    print("Output_shape", y_train.shape)
-    print("TEST DATA")
-    print("Input shape", x_test.shape)
-    print("Output_shape", y_test.shape)
-    
-    return x_train, y_train, x_test, y_test#, y_test_denorm, norm_params
-
+from utils import product,check_params, read_results_file
 
 
 def _run_experiment(
@@ -134,17 +45,19 @@ def _run_experiment(
 
     results = read_results_file(csv_filepath, metrics)
 
-    x_train, y_train, x_test, y_test, y_test_denorm, norm_params = read_data(
+    x_train, y_train, x_test, y_test, y_train_denorm, y_test_denorm, norm_params, index_target_series = read_data(
         normalization_method, past_history_factor
-    )
+    )    
+    
     x_train = tf.convert_to_tensor(x_train)
     y_train = tf.convert_to_tensor(y_train)
     x_test = tf.convert_to_tensor(x_test)
     y_test = tf.convert_to_tensor(y_test)
+    y_train_denorm = tf.convert_to_tensor(y_train_denorm)
     y_test_denorm = tf.convert_to_tensor(y_test_denorm)
 
+    past_history = x_test.shape[2]
     forecast_horizon = y_test.shape[1]
-    past_history = x_test.shape[1]
     steps_per_epoch = min(
         int(np.ceil(x_train.shape[0] / batch_size)), max_steps_per_epoch,
     )
@@ -171,24 +84,38 @@ def _run_experiment(
         shuffle=True,
     )
     training_time = time.time() - training_time_0
-
+    
+    train_forecast = model(x_train).numpy()
+    
+    for i in range(train_forecast.shape[0]):
+        nparams = norm_params[index_target_series]    # The index_target_series has to match the index of cam variable
+        train_forecast[i] = denormalize(
+            train_forecast[i], nparams, method=normalization_method,
+    )
+        
     # Get validation metrics
     test_time_0 = time.time()
     test_forecast = model(x_test).numpy()
     test_time = time.time() - test_time_0
 
     for i in range(test_forecast.shape[0]):
-        nparams = norm_params[0]
+        nparams = norm_params[index_target_series]
         test_forecast[i] = denormalize(
             test_forecast[i], nparams, method=normalization_method,
-        )
+    )
+        
     if metrics:
+        train_metrics = evaluate(y_train_denorm, train_forecast, metrics)
+        train_metrics = {k + "_train": v for k,v in train_metrics.items()}
         test_metrics = evaluate(y_test_denorm, test_forecast, metrics)
+        test_metrics = {k + "_test": v for k,v in test_metrics.items()}
+
     else:
+        train_metrics = {}
         test_metrics = {}
 
     # Save results
-    predictions_path = "{}/{}/{}/{}/DL/{}/{}/{}/{}/".format(
+    predictions_path = "{}/{}/{}/DL/{}/{}/{}/{}/".format(
         results_path,
         normalization_method,
         past_history_factor,
@@ -199,9 +126,14 @@ def _run_experiment(
     )
     if not os.path.exists(predictions_path):
         os.makedirs(predictions_path)
+        
     np.save(
-        predictions_path + str(model_index) + ".npy", test_forecast,
+        predictions_path + str(model_index) + "_train.npy", train_forecast,
     )
+    np.save(
+        predictions_path + str(model_index) + "_test.npy", test_forecast,
+    )
+    
     results = results.append(
         {
             "MODEL": model_name,
@@ -218,6 +150,7 @@ def _run_experiment(
             "NORMALIZATION": normalization_method,
             "TEST_TIME": test_time,
             "TRAINING_TIME": training_time,
+            **train_metrics,
             **test_metrics,
             "LOSS": str(history.history["loss"]),
             "VAL_LOSS": str(history.history["val_loss"]),
@@ -229,11 +162,11 @@ def _run_experiment(
         csv_filepath, sep=";",
     )
 
-    print('END OF EXPERIMENT -> ./results/{}/{}/{}/{}/{}/{}/{}/{}'.format(normalization_method,
+    print('END OF EXPERIMENT -> ./results/{}/{}/{}/{}/{}/{}/{}'.format(normalization_method,
                                                                            past_history_factor, epochs, learning_rate,
                                                                            batch_size, model_name, model_index))
     gc.collect()
-    del model, x_train, x_test, y_train, y_test, y_test_denorm, test_forecast
+    del model, x_train, x_test, y_train, y_test, test_forecast, y_train_denorm, y_test_denorm
 
 
 def run_experiment(
@@ -403,6 +336,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     main(args)
-    # main_ml(args.models_ml, args.metrics, args.output)
+    main_ml(args.models_ml, args.parameters, args.metrics, args.output)
     # obtain_best_results()
     # get_metrics()

@@ -156,9 +156,10 @@ for normalization_method, past_history_factor in itertools.product(
                 # norm_params,
                 # normalization_method
             )
-        
-            train_metrics = np.mean(np.abs(train_forecast, np.squeeze(Y_train)))
-            test_metrics = np.mean(np.abs(test_forecast, np.squeeze(Y_test)))
+
+            # TODO: There was an error here, we were not doing the minus operation
+            train_metrics = np.mean(np.abs(train_forecast - np.squeeze(Y_train)))
+            test_metrics = np.mean(np.abs(test_forecast - np.squeeze(Y_test)))
             
             results = results.append(
                 {

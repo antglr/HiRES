@@ -13,6 +13,9 @@ x_cav_main = x[:,0]  # 0 - CAV_MAIN AMP
 x_cavp_main = x[:,1]
 x_cav_aux  = x[:,2]  # 2 - CAV_AUX AMP
 x_cavp_aux = x[:,3]
+x_laser_amp = x[:,4] # 4 - Laser AMP
+x_laser_phs = x[:,5] # 5 - Laser PHS
+
 row = x_cav_main.shape[0]
 
 # Compute energy gain according to E = A*cos(phi)
@@ -49,6 +52,9 @@ x_egain_main = np.reshape(x_egain_main, (n_bufs, buf_pts))
 x_cav_aux = np.reshape(x_cav_aux, (n_bufs, buf_pts))
 x_cavp_aux = np.reshape(x_cavp_aux, (n_bufs, buf_pts))
 x_egain_aux = np.reshape(x_egain_aux, (n_bufs, buf_pts))
+
+x_laser_amp = np.reshape(x_laser_amp, (n_bufs, buf_pts))
+x_laser_phs = np.reshape(x_laser_phs, (n_bufs, buf_pts))
 
 do_histogram = True
 if do_histogram:
@@ -95,6 +101,9 @@ xcava_avg = np.mean(x_cav_aux[:,win_start:win_start+win], axis=1)
 xcavap_avg = np.mean(x_cavp_aux[:,win_start:win_start+win], axis=1)
 xegaina_avg = np.mean(x_egain_aux[:,win_start:win_start+win], axis=1)
 
+x_laser_amp_avg = np.mean(x_laser_amp[:,win_start:win_start+win], axis=1)
+x_laser_phs_avg = np.mean(x_laser_phs[:,win_start:win_start+win], axis=1)
+
 # Normalize only amplitude and energy gain
 xcavm_ac = (xcavm_avg-np.mean(xcavm_avg))/np.mean(xcavm_avg)
 xcavmp_ac = (xcavmp_avg-np.mean(xcavmp_avg))
@@ -103,6 +112,9 @@ xegainm_ac = (xegainm_avg-np.mean(xegainm_avg))/np.mean(xegainm_avg)
 xcava_ac = (xcava_avg-np.mean(xcava_avg))/np.mean(xcava_avg)
 xcavap_ac = (xcavap_avg-np.mean(xcavap_avg))
 xegaina_ac = (xegaina_avg-np.mean(xegaina_avg))/np.mean(xegaina_avg)
+
+x_laser_amp_ac = (x_laser_amp_avg-np.mean(x_laser_amp_avg))/np.mean(x_laser_amp_avg)
+x_laser_phs_ac = (x_laser_phs_avg-np.mean(x_laser_phs_avg))/np.mean(x_laser_phs_avg)
 
 plt.subplot("311")
 plt.plot(xcavm_ac, label='In-loop Magnitude normalized error')
@@ -123,9 +135,8 @@ plt.show()
 if True:
     save_d = [("In-loop Magnitude", xcavm_ac), ("In-loop Phase", xcavmp_ac),
               ("OOL Magnitude", xcava_ac), ("OOL Phase", xcavap_ac),
-              ("In-loop Energy", xegainm_ac), ("OOL Energy", xegaina_ac)]
-
+              ("In-loop Energy", xegainm_ac), ("OOL Energy", xegaina_ac)
+              ("Laser Amplitude", x_laser_amp_ac), ("Laser Phase", x_laser_phs_ac)]
     header = ",".join([x[0] for x in save_d])
     data = tuple([x[1] for x in save_d])
     np.savetxt(sys.argv[1]+".post", np.vstack(data).transpose(), header=header)
-

@@ -2,9 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 
-from from_post2np import IL_Energy
-
-
 def windows_preprocessing(time_series, camera_series, past_history, forecast_horizon):
     x, y = [], []
     for j in range(past_history, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
@@ -20,21 +17,25 @@ def windows_preprocessing(time_series, camera_series, past_history, forecast_hor
     return np.array(x), np.array(y)
 
 ## Loading Files 
-cam = np.load("Camera.npy")
-OL_phs = np.load("OL_Phase.npy")
-OL_amp = np.load("OL_Magnitude.npy")
-ILmOL_phs = np.load("OL_Phase.npy") - np.load("IL_Phase.npy")
-ILmOL_amp = np.load("OL_Magnitude.npy") - np.load("IL_Magnitude.npy")
-laser_Phs = np.load("OL_Energy.npy")   #TBC
-laser_amp = np.load("IL_Energy.npy")   #TBC
+InOrOut = "OutLoop"
+#InOrOut = "InLoop" 
+camFit = np.load("data/"+InOrOut+"/CameraFit.npy")
+camProj = np.load("data/"+InOrOut+"/CameraProj.npy")
+OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")
+OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy")
+ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy")
+ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy")
+laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")   
+laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  
 
 ##SplittingRatio ML 
 percentage = 80 #-- Train
-split = int(np.shape(cam)[0]*percentage/100)
-past_history = 15
+split = int(np.shape(camFit)[0]*percentage/100)
+#split = int(np.shape(camProj)[0]*percentage/100)  #<-- Projection
+past_history = 60
 forecast_horizon = 1
 
-print("Shape Camera  -->",np.shape(cam))
+print("Shape Camera  -->",np.shape(camFit))
 print("Shape RF Phase  -->",np.shape(OL_phs))
 print("Shape RF Amplitude  -->",np.shape(OL_amp))
 print("Shape Laser Phase  -->",np.shape(laser_Phs))
@@ -43,7 +44,8 @@ print("------------------------------------------")
 print("")
 #assert(np.shape(cam)==np.shape(OL_phs)==np.shape(OL_amp))
 
-cam_train, cam_test = cam[:split], cam[split:]
+cam_train, cam_test = camFit[:split], camFit[split:]
+#cam_train, cam_test = camProj[:split], camProj[split:] #<-- Projection
 phs_train, phs_test = OL_phs[:split], OL_phs[split:]
 amp_train, amp_test = OL_amp[:split], OL_amp[split:]
 diffPhs_train, diffPhs_test = ILmOL_phs[:split], ILmOL_phs[split:]

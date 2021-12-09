@@ -115,7 +115,7 @@ def _run_experiment(
         test_metrics = {}
 
     # Save results
-    predictions_path = "{}/{}/{}/DL/{}/{}/{}/{}/".format(
+    predictions_path = "{}/Norm_{}/{}/DL/{}/{}/{}/{}/".format(
         results_path,
         normalization_method,
         past_history_factor,

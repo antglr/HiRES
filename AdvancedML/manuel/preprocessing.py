@@ -1,22 +1,82 @@
 import numpy as np
 import copy
+
+
 def read_data(normalization_method, past_history_factor):
     ## Loading Files 
-    cam = np.load("../data/Camera.npy")
-    phs = np.load("../data/OL_Phase.npy")
-    amp = np.load("../data/OL_Magnitude.npy")
+    #InOrOut = "OutLoop"
+    InOrOut = "InLoop" 
+    # cam = np.load("../data/Camera.npy")
+    # phs = np.load("../data/OL_Phase.npy")
+    # amp = np.load("../data/OL_Magnitude.npy")
+    camFit = np.load("../data/"+InOrOut+"/CameraFit.npy")    
+    #camProj = np.load("../data/"+InOrOut+"/CameraProj.npy")  
+    OL_phs = np.load("../data/"+InOrOut+"/OL_Phase.npy")     
+    OL_amp = np.load("../data/"+InOrOut+"/OL_Magnitude.npy") 
+    ILmOL_phs = np.load("../data/"+InOrOut+"/OL_Phase.npy") - np.load("../data/"+InOrOut+"/IL_Phase.npy") 
+    ILmOL_amp = np.load("../data/"+InOrOut+"/OL_Magnitude.npy") - np.load("../data/"+InOrOut+"/IL_Magnitude.npy") 
+    laser_Phs = np.load("../data/"+InOrOut+"/Laser_Phs.npy")  
+    laser_amp = np.load("../data/"+InOrOut+"/Laser_Amp.npy")  
 
     ##SplittingRatio ML 
     percentage = 80 #-- Train
-    split = int(np.shape(cam)[0]*percentage/100)
+    split = int(np.shape(camFit)[0]*percentage/100)
+    #split = int(np.shape(camProj)[0]*percentage/100)
     forecast_horizon = 1
-    
-    cam_train, cam_test = cam[:split], cam[split:]
-    phs_train, phs_test = phs[:split], phs[split:]
-    amp_train, amp_test = amp[:split], amp[split:]
-    
-    train = np.array([cam_train, phs_train, amp_train])
-    test = np.array([cam_test, phs_test, amp_test])
+    targetShift = -2
+    fetureSelection = 0
+
+    if (targetShift!=0):
+        data_ln = len(camFit)
+        OL_phs_shift = np.zeros([data_ln])
+        OL_amp_shift = np.zeros([data_ln])
+        ILmOL_phs_shift = np.zeros([data_ln])
+        ILmOL_amp_shift = np.zeros([data_ln])
+        laser_Phs_shift = np.zeros([data_ln])
+        laser_amp_shift = np.zeros([data_ln])
+        OL_phs_shift = np.roll(OL_phs,targetShift)
+        OL_amp_shift = np.roll(OL_amp,targetShift)
+        ILmOL_phs_shift = np.roll(ILmOL_phs,targetShift)
+        ILmOL_amp_shift = np.roll(ILmOL_amp,targetShift)
+        laser_Phs_shift = np.roll(laser_Phs,targetShift)
+        laser_amp_shift = np.roll(laser_amp,targetShift)
+        
+        camFit_2  = camFit[:targetShift]
+        #camProj_2 = camProj[:targetShift]
+        OL_phs_2 = OL_phs_shift[:targetShift]
+        OL_amp_2 = OL_amp_shift[:targetShift]
+        ILmOL_phs_2 = ILmOL_phs_shift[:targetShift]
+        ILmOL_amp_2 = ILmOL_amp_shift[:targetShift]
+        laser_Phs_2 = laser_Phs_shift[:targetShift]
+        laser_amp_2 = laser_amp_shift[:targetShift]
+        
+        cam_train, cam_test = camFit_2[:split], camFit_2[split:] 
+        #cam_train, cam_test = camProj_2[:split], camProj_2[split:]       
+        phs_train, phs_test = OL_phs_2[:split], OL_phs_2[split:]
+        amp_train, amp_test = OL_amp_2[:split], OL_amp_2[split:]
+        IOphs_train, IOphs_test = ILmOL_phs_2[:split], ILmOL_phs_2[split:]
+        IOamp_train, IOamp_test = ILmOL_amp_2[:split], ILmOL_amp_2[split:]
+        Lphs_train, Lphs_test = laser_Phs_2[:split], laser_Phs_2[split:]
+        Lamp_train, Lamp_test = laser_amp_2[:split], laser_amp_2[split:]
+    else:
+        #WITHOUT SHIFT
+        cam_train, cam_test = camFit[:split], camFit[split:]
+        #cam_train, cam_test = camProj[:split], camProj[split:] 
+        phs_train, phs_test = OL_phs[:split], OL_phs[split:]
+        amp_train, amp_test = OL_amp[:split], OL_amp[split:]
+        IOphs_train, IOphs_test = ILmOL_phs[:split], ILmOL_phs[split:]
+        IOamp_train, IOamp_test = ILmOL_amp[:split], ILmOL_amp[split:]
+        Lphs_train, Lphs_test = laser_Phs[:split], laser_Phs[split:]
+        Lamp_train, Lamp_test = laser_amp[:split], laser_amp[split:]    
+
+    if fetureSelection:
+        # Selected variables
+        train = np.array([cam_train, phs_train, amp_train, IOamp_train, Lamp_train])
+        test = np.array([cam_test, phs_test, amp_test, IOamp_test, Lamp_test])
+    else:
+        # All variables
+        train = np.array([cam_train, phs_train, amp_train,IOphs_train, IOamp_train, Lphs_train, Lamp_train]) 
+        test = np.array([cam_test, phs_test, amp_test,IOphs_test, IOamp_test, Lphs_test, Lamp_test])
     index_target_series = 0     # The index of cam_train, the target variable
 
     train, test, norm_params = normalize_dataset(

@@ -84,9 +84,9 @@ def main_ml(models_ml, parameters_file, metrics, results_path):
                 )
 
                 if metrics:
-                    train_metrics = evaluate(y_train_denorm, train_forecast, metrics)
+                    train_metrics = evaluate(np.expand_dims(y_train_denorm.squeeze(1), 0), np.expand_dims(train_forecast, 0), metrics)
                     train_metrics = {k + "_train": v for k,v in train_metrics.items()}
-                    test_metrics = evaluate(y_test_denorm, test_forecast, metrics)
+                    test_metrics = evaluate(np.expand_dims(y_test_denorm.squeeze(1), 0), np.expand_dims(test_forecast, 0), metrics)
                     test_metrics = {k + "_test": v for k,v in test_metrics.items()}
 
                 else:
@@ -144,6 +144,6 @@ def main_ml(models_ml, parameters_file, metrics, results_path):
 
 if __name__ == '__main__':
     models_ml = ['rf']
-    metrics = [ 'mae']
+    metrics = [ 'mae', 'rmse']
     parameters_file = './parameters.json'
     main_ml(models_ml, parameters_file, metrics, 'results')

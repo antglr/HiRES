@@ -4,8 +4,8 @@ import copy
 
 def read_data(normalization_method, past_history_factor):
     ## Loading Files 
-    #InOrOut = "OutLoop"
-    InOrOut = "InLoop" 
+    InOrOut = "OutLoop"
+    # InOrOut = "InLoop" 
     # cam = np.load("../data/Camera.npy")
     # phs = np.load("../data/OL_Phase.npy")
     # amp = np.load("../data/OL_Magnitude.npy")

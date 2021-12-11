@@ -1,10 +1,10 @@
 GPU=0
 LOG_FILE=./experiments${GPU}.out
 MODELS=('lstm' 'cnn' 'mlp' )
-MODELS_ML=('tree' 'rf' 'lr')
-METRICS=('mae')
+MODELS_ML=('rf' 'lr')
+METRICS=('mae' 'rmse' 'mse')
 PARAMETERS=./parameters.json
 OUTPUT=results
 CSV_FILENAME=results.csv
 
-python main.py --models ${MODELS[@]} --models_ml ${MODELS_ML[@]} --gpu ${GPU}  --metrics $METRICS --parameters  $PARAMETERS --output $OUTPUT --csv_filename $CSV_FILENAME > $LOG_FILE 2>&1 &
+python main.py --models ${MODELS[@]} --models_ml ${MODELS_ML[@]} --gpu ${GPU}  --metrics ${METRICS[@]} --parameters  $PARAMETERS --output $OUTPUT --csv_filename $CSV_FILENAME > $LOG_FILE 2>&1 &

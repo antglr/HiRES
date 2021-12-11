@@ -1,8 +1,8 @@
 {
     "normalization_method": ["None", "minmax", "zscore"],
-    "past_history_factor": [15, 30, 60, 90, 120],
-    "batch_size": [32, 64],
-    "epochs": [5, 20],
+    "past_history_factor": [1, 5, 15, 60, 120],
+    "batch_size": [32],
+    "epochs": [20],
     "max_steps_per_epoch": [10000],
     "learning_rate": [0.001, 0.01],
     "model_params": {
@@ -20,12 +20,6 @@
             "conv_blocks": [
                 [[16, 3, 2]]
             ]
-        },
-        "tree":{
-            "splitter" : ["best","random"],
-            "max_depth" : [2, 8],
-            "min_samples_split" : [2, 6],
-            "min_samples_leaf": [3, 7]
         },
         "rf" : {
             "n_stimators" : [100],

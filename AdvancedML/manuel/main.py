@@ -105,9 +105,11 @@ def _run_experiment(
     )
         
     if metrics:
-        train_metrics = evaluate(np.expand_dims(y_train_denorm.squeeze(1), 0), np.expand_dims(train_forecast, 0), metrics)
+        print(y_train_denorm.numpy().shape)
+        print(train_forecast.shape)
+        train_metrics = evaluate(np.expand_dims(y_train_denorm.numpy().squeeze(1), 0), np.expand_dims(train_forecast.squeeze(1), 0), metrics)
         train_metrics = {k + "_train": v for k,v in train_metrics.items()}
-        test_metrics = evaluate(np.expand_dims(y_test_denorm.squeeze(1), 0), np.expand_dims(test_forecast, 0), metrics)
+        test_metrics = evaluate(np.expand_dims(y_test_denorm.numpy().squeeze(1), 0), np.expand_dims(test_forecast.squeeze(1), 0), metrics)
         test_metrics = {k + "_test": v for k,v in test_metrics.items()}
 
     else:

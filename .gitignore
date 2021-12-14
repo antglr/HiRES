@@ -1,4 +1,4 @@
 *pyc
-AdvancedML/manuel/results/**/*.npy
+AdvancedML/manuel/**/**/*.npy
 *.out
-AdvancedML/manuel/results/results.csv
+AdvancedML/manuel/**/results.csv

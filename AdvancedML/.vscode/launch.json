@@ -17,6 +17,17 @@
             "request": "launch",
             "program": "Main.py",
             "console": "integratedTerminal"
-        }
+        },
+        {
+            "name": "MainML",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/manuel/HiRES/AdvancedML/manuel",
+            "args": ["--models","cnn",
+            "--parameters=./parameters.json",
+            "--metrics", "mae", "rmse", "mse"]
+        },
     ]
 }

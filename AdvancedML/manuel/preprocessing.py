@@ -113,10 +113,11 @@ def windows_preprocessing(time_series, target_time_series, past_history_factor, 
         window_ts = []
         for i in range(time_series.shape[0]):
             window_ts.append(time_series[i, indices])
-        window = np.array(window_ts)
+        window = np.array(window_ts).transpose((1,0)) # Shape [samples, timesteps, n_features]
 
         x.append(window)
         y.append(target_time_series[j: j + forecast_horizon])
+    
     return np.array(x), np.array(y)
 
 

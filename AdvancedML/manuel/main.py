@@ -299,7 +299,7 @@ def main(args):
                     p.start()
                     p.join()
 
-                    assert error_dict["status"] == 1, error_dict["message"]
+                    #assert error_dict["status"] == 1, error_dict["message"]
 
 
 if __name__ == "__main__":

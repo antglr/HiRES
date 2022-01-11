@@ -108,7 +108,7 @@ camFit = np.load("data/"+InOrOut+"/CameraFit.npy")    #Y
 camProj = np.load("data/"+InOrOut+"/CameraProj.npy")  #Y
 OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
 OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
-ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X -- OT USED  
+ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X -- NOT USED  
 ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
 laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X -- NOT USED  
 laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
@@ -116,11 +116,12 @@ laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
 ##SplittingRatio ML 
 percentage = 80 #-- Train
 fit_or_proj = "fit" 
-past_history = 60
+past_history = 30
 forecast_horizon = 1
-targetShift = -2
-fetureSelection = 0
 normalization_method = 'minmax'
+
+targetShift = 0
+fetureSelection = 0
 
 data_ln = len(camFit)
 # SHIFT
@@ -154,6 +155,7 @@ split = int(traintest_size*percentage/100)
 metric_train = []
 metric_test = []
 for i in range(splitting_traintest):
+    print("HI")
     start_train = (traintest_size*i)
     stop_train = (split*(i+1))
     start_test = stop_train + 1
@@ -177,11 +179,8 @@ for i in range(splitting_traintest):
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(forecast_horizon)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-2), loss="mse")
-    # , learning_rate=0.01)
-    
-    
-    model.fit(X_train,Y_train,batch_size=8, epochs=20, steps_per_epoch=123, shuffle=False)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss="mse")    
+    history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
     train_forecast = model(X_train).numpy()
     Y_train_denorm = np.zeros(Y_train.shape)
     for j in range(Y_train.shape[0]):
@@ -204,8 +203,19 @@ for i in range(splitting_traintest):
 
     metric_test.append(mean_squared_error(Y_test_denorm, test_forecast, squared=False))
 
+    train_loss = history.history['loss']
+    test_loss = history.history['val_loss']
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.plot(train_loss,"k",label="Training")
+    ax.plot(test_loss,"r",label="Test")
+    ax.set_xlabel("Epochs")
+    ax.set_ylabel("Loss")
+    ax.set_title("Segement")
+    plt.legend()
 
 metric_train = [np.format_float_scientific(m, precision=2) for m in metric_train]
 print("Training RMSE",metric_train)
 metric_test = [np.format_float_scientific(m, precision=2) for m in metric_test]
 print("Test RMSE",metric_test)
+
+plt.show()

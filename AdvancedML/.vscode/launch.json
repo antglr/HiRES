@@ -15,7 +15,7 @@
             "name": "Debugg",
             "type": "python",
             "request": "launch",
-            "program": "Main.py",
+            "program": "Main_Net.py",
             "console": "integratedTerminal"
         },
         {

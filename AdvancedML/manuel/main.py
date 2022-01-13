@@ -56,7 +56,7 @@ def _run_experiment(
     y_train_denorm = tf.convert_to_tensor(y_train_denorm)
     y_test_denorm = tf.convert_to_tensor(y_test_denorm)
 
-    past_history = x_test.shape[2]
+    past_history = x_test.shape[1]
     forecast_horizon = y_test.shape[1]
     steps_per_epoch = min(
         int(np.ceil(x_train.shape[0] / batch_size)), max_steps_per_epoch,

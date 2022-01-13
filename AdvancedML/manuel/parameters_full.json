@@ -1,8 +1,8 @@
 {
     "normalization_method": ["None", "minmax", "zscore"],
-    "past_history_factor": [15, 30, 60, 100, 120],
-    "batch_size": [32, 64],
-    "epochs": [5, 10],
+    "past_history_factor": [1, 5, 15, 60, 120],
+    "batch_size": [8, 32],
+    "epochs": [20, 50],
     "max_steps_per_epoch": [10000],
     "learning_rate": [0.001, 0.01],
     "model_params": {

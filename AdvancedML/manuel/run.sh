@@ -3,7 +3,7 @@ LOG_FILE=./experiments${GPU}.out
 MODELS=('lstm' 'cnn' 'mlp' )
 MODELS_ML=('rf' 'lr')
 METRICS=('mae' 'rmse' 'mse')
-PARAMETERS=./parameters.json
+PARAMETERS=./parameters_full.json
 OUTPUT=results
 CSV_FILENAME=results.csv
 

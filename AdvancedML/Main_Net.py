@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 import scipy.io as sio
-from keras import backend as K
+# from keras import backend as K
 
 def normalize(data, norm_params, normalization_method="zscore"):
     """
@@ -103,7 +103,7 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
     return np.array(x), np.array(y)
 
 def rmse(y_pred, y_true):
-    return K.sqrt(K.mean(K.square(y_pred - y_true)))
+    return keras.backend.sqrt(keras.backend.mean(keras.backend.square(y_pred - y_true)))
 
 ## Loading Files 
 InOrOut = "OutLoop"
@@ -181,27 +181,27 @@ for i in range(splitting_traintest):
     X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
 
     print(np.shape(X_test))
-    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
-    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
+    # X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
+    # X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    # model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
     #model = LinearRegression()
     #model = MLPRegressor(hidden_layer_sizes=[32,16,8], random_state=1, max_iter=500)
     ###train_forecast_pre = model.predict(X_train) <-- Dose not work....
-    model.fit(X_train,Y_train)
-    train_forecast = model.predict(X_train)
+    # model.fit(X_train,Y_train)
+    # train_forecast = model.predict(X_train)
     
-    #inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    #x = tf.keras.layers.LSTM(units=128, return_sequences=False)(inputs)
-    #x = tf.keras.layers.Flatten()(x)
-    #x = tf.keras.layers.Dense(forecast_horizon)(x)
-    #model = tf.keras.Model(inputs=inputs, outputs=x)
-    #model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss=rmse)   
-    ##callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
-    #train_forecast_pre = model(X_train).numpy()
-    ##history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False, callbacks=[callback])
-    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
-    #train_forecast = model(X_train).numpy()
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.LSTM(units=128, return_sequences=False)(inputs)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(forecast_horizon)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss=rmse)   
+    #callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
+    train_forecast_pre = model(X_train).numpy()
+    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False, callbacks=[callback])
+    history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
+    train_forecast = model(X_train).numpy()
     
     Y_train_denorm = np.zeros(Y_train.shape)
     for j in range(Y_train.shape[0]):

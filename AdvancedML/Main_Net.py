@@ -5,9 +5,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import TimeSeriesSplit
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
+#import tensorflow as tf
+#from tensorflow import keras
+#from tensorflow.keras import layers
 import scipy.io as sio
 # from keras import backend as K
 
@@ -102,8 +102,56 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
         y.append(camera_series[j: j + forecast_horizon])
     return np.array(x), np.array(y)
 
-def rmse(y_pred, y_true):
-    return keras.backend.sqrt(keras.backend.mean(keras.backend.square(y_pred - y_true)))
+# def rmse(y_pred, y_true):
+#     return keras.backend.sqrt(keras.backend.mean(keras.backend.square(y_pred - y_true)))
+
+
+def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
+    fig, (ax1,ax2) = plt.subplots(1,2,figsize=(12,6),sharey=True)
+    ax1.plot(train_forecast,np.squeeze(Y_train),"+k")
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax1.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
+    ax1.set_ylabel("Label")
+    ax1.set_xlabel("Prediction")
+    ax1.set_title("Train")
+    ax1.grid(axis="x")
+    ax1.grid(axis="y")
+    ax2.plot(test_forecast,np.squeeze(Y_test),"+k")
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax2.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
+    ax2.set_xlabel("Prediction")
+    ax2.set_title("Test")
+    ax2.grid(axis="x")
+    ax2.grid(axis="y")
+    plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
+    return 
+
+def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
+    massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
+    minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
+
+    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
+    ax1.plot(np.squeeze(Y_train),"r",label= "Label")
+    ax1.plot(train_forecast,"k",label= "Prediction")
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax1.set_ylabel("Centroid Error")
+    ax1.set_title("Train")
+    ax1.grid(axis="x")
+    ax1.grid(axis="y")
+    ax1.set_ylim((minimo, massimo))
+    ax1.legend()
+    ax2.plot(np.squeeze(Y_test),"r",label= "Label")
+    ax2.plot(test_forecast,"k",label= "Prediction")
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax2.set_ylabel("Centroid Error")
+    ax2.set_xlabel("Time")
+    ax2.set_title("Test")
+    ax2.grid(axis="x")
+    ax2.grid(axis="y")
+    ax2.set_ylim((minimo, massimo))
+    ax2.legend()
+    plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
+    return 
 
 ## Loading Files 
 InOrOut = "OutLoop"
@@ -167,7 +215,7 @@ print("")
 print("Dataset length:",data_ln)
 for i in range(splitting_traintest):
     start_train = traintest_size*i
-    stop_train = split*(i+1)
+    stop_train = traintest_size*i + split
     start_test = stop_train + 1
     stop_test = traintest_size*(i+1)-1
 
@@ -181,27 +229,28 @@ for i in range(splitting_traintest):
     X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
 
     print(np.shape(X_test))
-    # X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
-    # X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
+    print(np.shape(X_train))    
+    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
+    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    # model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
     #model = LinearRegression()
     #model = MLPRegressor(hidden_layer_sizes=[32,16,8], random_state=1, max_iter=500)
     ###train_forecast_pre = model.predict(X_train) <-- Dose not work....
-    # model.fit(X_train,Y_train)
-    # train_forecast = model.predict(X_train)
+    model.fit(X_train,Y_train)
+    train_forecast = model.predict(X_train)
     
-    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    x = tf.keras.layers.LSTM(units=128, return_sequences=False)(inputs)
-    x = tf.keras.layers.Flatten()(x)
-    x = tf.keras.layers.Dense(forecast_horizon)(x)
-    model = tf.keras.Model(inputs=inputs, outputs=x)
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss=rmse)   
+    #inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    #x = tf.keras.layers.LSTM(units=128, return_sequences=False)(inputs)
+    #x = tf.keras.layers.Flatten()(x)
+    #x = tf.keras.layers.Dense(forecast_horizon)(x)
+    #model = tf.keras.Model(inputs=inputs, outputs=x)
+    #model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.01), loss=rmse)   
     #callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
-    train_forecast_pre = model(X_train).numpy()
-    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False, callbacks=[callback])
-    history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
-    train_forecast = model(X_train).numpy()
+    #train_forecast_pre = model(X_train).numpy()
+    ##history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False, callbacks=[callback])
+    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
+    #train_forecast = model(X_train).numpy()
     
     Y_train_denorm = np.zeros(Y_train.shape)
     for j in range(Y_train.shape[0]):
@@ -236,11 +285,13 @@ for i in range(splitting_traintest):
     # ax.set_xlabel("Epochs")
     # ax.set_ylabel("Loss")
     # plt.legend()
+    
+    plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+    plt.show()
 
 ###print("Initial Guess ",metric_train_pre)
 metric_train = [np.format_float_scientific(m, precision=2) for m in metric_train]
 print("Training RMSE",metric_train)
 metric_test = [np.format_float_scientific(m, precision=2) for m in metric_test]
 print("Test RMSE",metric_test)
-
-# plt.show()

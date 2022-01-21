@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, kendalltau, spearmanr
 
 ## Selection of the dataset
-#InOrOut = "OutLoop"
-InOrOut = "InLoop"
-shiftRange = 3
+InOrOut = "OutLoop"
+#InOrOut = "InLoop"
+shiftRange = 6
  
 ## Loading Files 
 camFit = np.load("data/"+InOrOut+"/CameraFit.npy")

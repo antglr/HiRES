@@ -1,7 +1,7 @@
 import numpy as np
 
-#InOrOut = "OutLoop/"
-InOrOut = "InLoop/"
+InOrOut = "OutLoop/"
+#InOrOut = "InLoop/"
 
 
 f1 = InOrOut+"RF.post"

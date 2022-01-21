@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+# matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
@@ -10,6 +12,8 @@ from sklearn.model_selection import TimeSeriesSplit
 #from tensorflow.keras import layers
 import scipy.io as sio
 # from keras import backend as K
+from xgboost import XGBRegressor
+import pandas as pd
 
 def normalize(data, norm_params, normalization_method="zscore"):
     """
@@ -90,6 +94,7 @@ def normalize_dataset(train, test, normalization_method, dtype="float32"):
 def windows_preprocessing(time_series, past_history, forecast_horizon):
     x, y = [], []
     camera_series = time_series[0]
+    #time_series = time_series[1:]
     for j in range(past_history, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
         indices = list(range(j - past_history, j))
 
@@ -165,30 +170,25 @@ ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrO
 laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
 laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
 
+
 cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
 cam = cam['saveData']
 cam = cam[:,1]
 ##SplittingRatio ML 
 percentage = 80 #-- Train
 fit_or_proj = "fit" 
-past_history = 60
+past_history = 15
 forecast_horizon = 1
-normalization_method = 'minmax'
+normalization_method = 'zscore'
 
 targetShift = -2
-fetureSelection = 0
+fetureSelection = 1
+shouldIplot = 1
 
 data_ln = len(cam)
 # SHIFT
 if (targetShift!=0):
-    OL_phs = np.roll(OL_phs,targetShift)
-    OL_amp = np.roll(OL_amp,targetShift)
-    ILmOL_phs = np.roll(ILmOL_phs,targetShift)
-    ILmOL_amp = np.roll(ILmOL_amp,targetShift)
-    laser_Phs = np.roll(laser_Phs,targetShift)
-    laser_amp = np.roll(laser_amp,targetShift)
-    # camFit  = camFit[:targetShift]
-    # camProj = camProj[:targetShift]
+    cam = np.roll(cam,targetShift)
     cam  = cam[:targetShift]
     OL_phs = OL_phs[:targetShift]
     OL_amp = OL_amp[:targetShift]
@@ -199,12 +199,16 @@ if (targetShift!=0):
 
 if fetureSelection:
     # Selected variables
-    FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_amp, laser_amp]) 
+    #FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_amp, laser_amp]) 
+    FullDataset = np.array([cam, OL_phs, OL_amp]) 
 else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-splitting_traintest = 3
+
+feature_names = ['Cam', 'RF P', 'RF A', 'RF PD', 'RF AD', 'Laser P', 'Laser A']
+
+splitting_traintest = 2
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 
@@ -233,10 +237,11 @@ for i in range(splitting_traintest):
     X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
     X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=10000, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    #model = XGBRegressor(criterion='mse', n_jobs=-1, n_estimators=1000, max_depth=10, eta=0.1, subsamples=0.7, colsample_bytree=0.8)
     #model = LinearRegression()
     #model = MLPRegressor(hidden_layer_sizes=[32,16,8], random_state=1, max_iter=500)
-    ###train_forecast_pre = model.predict(X_train) <-- Dose not work....
+    #train_forecast_pre = model.predict(X_train) 
     model.fit(X_train,Y_train)
     train_forecast = model.predict(X_train)
     
@@ -252,6 +257,9 @@ for i in range(splitting_traintest):
     #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=False)
     #train_forecast = model(X_train).numpy()
     
+
+    
+
     Y_train_denorm = np.zeros(Y_train.shape)
     for j in range(Y_train.shape[0]):
         nparams = norm_params[0]
@@ -286,9 +294,10 @@ for i in range(splitting_traintest):
     # ax.set_ylabel("Loss")
     # plt.legend()
     
-    plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+    #plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
     plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-    plt.show()
+    if shouldIplot:
+        plt.show()
 
 ###print("Initial Guess ",metric_train_pre)
 metric_train = [np.format_float_scientific(m, precision=2) for m in metric_train]

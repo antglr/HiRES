@@ -1,16 +1,14 @@
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import TimeSeriesSplit
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
 import scipy.io as sio
+from xgboost import XGBRegressor
 import pandas as pd
 
 def normalize(data, norm_params, normalization_method="zscore"):
@@ -33,7 +31,7 @@ def normalize(data, norm_params, normalization_method="zscore"):
         denominator = norm_params["max"] - norm_params["min"]
 
         if denominator == 0.0:
-            denominator = 1e-10
+            denominator = 1e-10   
         return (data - norm_params["min"]) / denominator
 
     elif normalization_method == "None":
@@ -106,6 +104,7 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
     return np.array(x), np.array(y)
 
 
+
 def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     fig, (ax1,ax2) = plt.subplots(1,2,figsize=(12,6),sharey=True)
     ax1.plot(train_forecast,np.squeeze(Y_train),"+k")
@@ -155,9 +154,23 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     plt.savefig("plot3.png")
     return 
 
+def plot_feature_importances(model, feature_names, X_train, past_history):
+    feat_names = [ feature_names[int(i%len(feature_names))] + '_' + 
+                  str(int(i/len(feature_names))) for i in range(X_train.shape[1]) ]
+    importances = model.feature_importances_
+    std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
+    forest_importances = pd.Series(importances, index=feat_names)
+    fig, ax = plt.subplots(figsize=(60,10))
+    forest_importances.plot.bar(yerr=std, ax=ax)
+    ax.set_title("Feature importances using MDI")
+    ax.set_ylabel("Mean decrease in impurity")
+    # fig.tight_layout()
+    plt.savefig("feats_ph{}_bis.png".format(past_history))
+
+
 ## Loading Files 
 InOrOut = "OutLoop"
-#InOrOut = "InLoop" 
+# InOrOut = "InLoop" 
 #camFit = np.load("data/"+InOrOut+"/CameraFit.npy")    #Y
 #camProj = np.load("data/"+InOrOut+"/CameraProj.npy")  #Y
 OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
@@ -186,14 +199,14 @@ shouldIplot = 1
 data_ln = len(cam)
 # SHIFT
 if (targetShift!=0):
-    cam = np.roll(cam, targetShift)
+    cam = np.roll(cam,targetShift)
     cam  = cam[:targetShift]
     OL_phs = OL_phs[:targetShift]
     OL_amp = OL_amp[:targetShift]
     ILmOL_phs = ILmOL_phs[:targetShift]
     ILmOL_amp = ILmOL_amp[:targetShift]
     laser_Phs = laser_Phs[:targetShift]
-    laser_amp = laser_amp[:targetShift]    
+    laser_amp = laser_amp[:targetShift]
     Egain = Egain[:targetShift]
 
 if fetureSelection:
@@ -202,6 +215,11 @@ if fetureSelection:
 else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
+
+
+# feature_names = ['Cam', 'RF P', 'RF A', 'RF PD', 'RF AD', 'Laser P', 'Laser A']
+feature_names = ['Cam',  'RF A', 'RF P']
+
 
 
 splitting_traintest = 1
@@ -230,58 +248,16 @@ for i in range(splitting_traintest):
 
     print(np.shape(X_test))
     print(np.shape(X_train))    
+    X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
+    X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    # # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    # # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    # x = tf.keras.layers.LSTM(units=500, return_sequences=False, dropout=0.1)(inputs)
-    # x = tf.keras.layers.Flatten()(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(256, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(128, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(64, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(32, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(16, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(forecast_horizon)(x)
-    # model = tf.keras.Model(inputs=inputs, outputs=x)
-    
-    x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(512, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(64, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(32, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(16, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(8, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(forecast_horizon)(x)
-    model = tf.keras.Model(inputs=inputs, outputs=x)
-    
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
-    # lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-    #     initial_learning_rate=1e-2,
-    #     decay_steps=100,
-    #     decay_rate=0.9)
-    # optimizer = keras.optimizers.Adam(learning_rate=lr_schedule) 
-    # model.compile(optimizer=optimizer, loss='mse')  
-
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
-    train_forecast_pre = model(X_train).numpy()
-    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=True, callbacks=[callback])
-    history = model.fit(X_train,Y_train,batch_size=64, epochs=20, validation_data=(X_test,Y_test), shuffle=True)
-    train_forecast = model(X_train).numpy()
+    # model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    # model = XGBRegressor(n_estimators=100, max_depth=7, eta=0.1, subsample=0.7, colsample_bytree=0.8, n_jobs=-1)
+    # model = LinearRegression()
+    model = MLPRegressor(hidden_layer_sizes=[256, 128, 64, 32, 16, 8], random_state=1, max_iter=1000)
+    model.fit(X_train,Y_train)
+    train_forecast = model.predict(X_train)
+    # plot_feature_importances(model, feature_names, X_train, past_history)
 
     
 
@@ -293,7 +269,7 @@ for i in range(splitting_traintest):
     train_forecast = np.squeeze(train_forecast)
     metrics_train = np.abs(train_forecast-np.squeeze(Y_train_denorm))
 
-    test_forecast = model(X_test).numpy()
+    test_forecast = model.predict(X_test)
 
     Y_test_denorm = np.zeros(Y_test.shape)
     for j in range(Y_test.shape[0]):
@@ -303,21 +279,10 @@ for i in range(splitting_traintest):
     test_forecast = np.squeeze(test_forecast)
     metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
 
-    ###metric_train_pre.append(mean_squared_error(Y_train, train_forecast_pre))
-
     metric_train.append(mean_squared_error(Y_train_denorm, train_forecast, squared=False))
 
     metric_test.append(mean_squared_error(Y_test_denorm, test_forecast, squared=False))
 
-    train_loss = history.history['loss']
-    test_loss = history.history['val_loss']
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.plot(train_loss,"k",label="Training")
-    ax.plot(test_loss,"r",label="Test")
-    ax.set_xlabel("Epochs")
-    ax.set_ylabel("Loss")
-    plt.legend()
-    plt.savefig("loss_curves.png")
     plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
     plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
     if shouldIplot:

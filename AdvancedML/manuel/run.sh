@@ -1,9 +1,9 @@
 GPU=0
 LOG_FILE=./experiments${GPU}.out
-MODELS=('lstm' 'cnn' 'mlp' )
-MODELS_ML=('rf' 'lr')
-METRICS=('mae' 'rmse' 'mse')
-PARAMETERS=./parameters_full.json
+MODELS=('lstm')
+MODELS_ML=('rf')
+METRICS=('mse' 'mae' 'rmse')
+PARAMETERS=./parameters.json
 OUTPUT=results
 CSV_FILENAME=results.csv
 

@@ -19,15 +19,34 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "MainML",
+            "name": "Main",
             "type": "python",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "cwd": "/home/manuel/HiRES/AdvancedML/manuel",
-            "args": ["--models","cnn",
+            "args": ["--models","lstm",
             "--parameters=./parameters.json",
-            "--metrics", "mae", "rmse", "mse"]
+            "--metrics", "rmse"]
         },
+
+        {
+            "name": "MainML",
+            "type": "python",
+            "request": "launch",
+            "program": "main_ml.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/manuel/HiRES/AdvancedML/manuel",
+        },
+
+        
+        {
+            "name": "MainNet",
+            "type": "python",
+            "request": "launch",
+            "program": "Main_Net.py",
+            "console": "integratedTerminal",
+        },
+
     ]
 }

@@ -98,7 +98,7 @@ def lstm(
     for hidden_units in dense_layers:
         x = tf.keras.layers.Dense(hidden_units)(x)
         if dense_dropout > 0:
-            x = tf.keras.layers.Dropout(dense_dropout)(dense_dropout)
+            x = tf.keras.layers.Dropout(dense_dropout)(x)
     x = tf.keras.layers.Dense(output_size)(x)
 
     model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -223,6 +223,8 @@ def create_rnn(func):
         loss="mae",
         recurrent_units=[args["units"]] * args["layers"],
         return_sequences=args["return_sequence"],
+        dense_layers=args["dense_layers"],
+        dense_dropout=args["dense_dropout"]
     )
 
 

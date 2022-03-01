@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-# matplotlib.use("Agg")
+#matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from sklearn.ensemble import RandomForestRegressor
@@ -175,9 +175,9 @@ percentage = 80
 fit_or_proj = "fit" 
 past_history = 30
 forecast_horizon = 1
-normalization_method = 'minmax'
+normalization_method = 'zscore'
 targetShift = -2
-fetureSelection = 0
+fetureSelection = 1
 shouldIplot = 0
 
 loadboth = 0
@@ -214,7 +214,7 @@ else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-splitting_traintest = 2
+splitting_traintest = 1
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 

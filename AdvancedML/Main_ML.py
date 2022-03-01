@@ -104,7 +104,6 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
     return np.array(x), np.array(y)
 
 
-
 def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     fig, (ax1,ax2) = plt.subplots(1,2,figsize=(12,6),sharey=True)
     ax1.plot(train_forecast,np.squeeze(Y_train),"+k")
@@ -130,7 +129,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
 
-    fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(14,7))
+    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
     ax1.plot(train_forecast,"k",label= "Prediction")
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -190,16 +189,15 @@ def loading(InOrOut):
     return OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam
 
 
-
 #InLoop
 OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
 percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
 forecast_horizon = 1
-normalization_method = 'minmax'
+normalization_method = 'zscore'
 targetShift = -2
-fetureSelection = 0
+fetureSelection = 1
 shouldIplot = 0
 
 loadboth = 0

@@ -19,6 +19,13 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "MainML",
+            "type": "python",
+            "request": "launch",
+            "program": "Main_ML.py",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Main",
             "type": "python",
             "request": "launch",

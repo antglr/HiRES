@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib
 # matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
@@ -279,9 +279,9 @@ for i in range(splitting_traintest):
     test_forecast = np.squeeze(test_forecast)
     metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
 
-    metric_train.append(mean_squared_error(Y_train_denorm, train_forecast, squared=False))
+    metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
 
-    metric_test.append(mean_squared_error(Y_test_denorm, test_forecast, squared=False))
+    metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
 
     plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
     plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
@@ -289,7 +289,13 @@ for i in range(splitting_traintest):
         plt.show()
 
 ###print("Initial Guess ",metric_train_pre)
-metric_train = [np.format_float_scientific(m, precision=2) for m in metric_train]
-print("Training RMSE",metric_train)
-metric_test = [np.format_float_scientific(m, precision=2) for m in metric_test]
-print("Test RMSE",metric_test)
+m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
+print("Training RMSE",m_train)
+m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
+print("Test RMSE",m_test)
+
+m_train = [m[1]*100 for m in metric_train]
+print("Training MAPE",m_train)
+m_test = [m[1]*100 for m in metric_test]
+print("Test MAPE",m_test)
+

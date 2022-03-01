@@ -1,8 +1,8 @@
 import numpy as np
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.neural_network import MLPRegressor
@@ -157,7 +157,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
 
 ## Loading Files 
 InOrOut = "OutLoop"
-#InOrOut = "InLoop" 
+# InOrOut = "InLoop" 
 #camFit = np.load("data/"+InOrOut+"/CameraFit.npy")    #Y
 #camProj = np.load("data/"+InOrOut+"/CameraProj.npy")  #Y
 OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
@@ -232,42 +232,42 @@ for i in range(splitting_traintest):
     print(np.shape(X_train))    
     
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    # # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    # # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    # x = tf.keras.layers.LSTM(units=500, return_sequences=False, dropout=0.1)(inputs)
-    # x = tf.keras.layers.Flatten()(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(256, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(128, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(64, activation='relu')(x)
+    # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
+    # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
+    x = tf.keras.layers.LSTM(units=300, return_sequences=False, dropout=0.1)(inputs)
+    x = tf.keras.layers.Flatten()(x)
     # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.Dense(32, activation='relu')(x)
-    # # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(16, activation='relu')(x)
+    # x = tf.keras.layers.Dense(256, activation='relu')(x)
     # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(forecast_horizon)(x)
-    # model = tf.keras.Model(inputs=inputs, outputs=x)
-    
-    x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(512, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(128, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(64, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(32, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(32, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(16, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dense(8, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Dense(forecast_horizon)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
+    
+    # x = tf.keras.layers.Flatten()(inputs)
+    # x = tf.keras.layers.Dense(512, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    # # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(64, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    # # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(32, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    # # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(16, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    # # x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(8, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    # # x = tf.keras.layers.BatchNormalization()(x)f
+    # x = tf.keras.layers.Dense(forecast_horizon)(x)
+    # model = tf.keras.Model(inputs=inputs, outputs=x)
     
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
     # lr_schedule = keras.optimizers.schedules.ExponentialDecay(
@@ -280,7 +280,7 @@ for i in range(splitting_traintest):
     callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
     train_forecast_pre = model(X_train).numpy()
     #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=True, callbacks=[callback])
-    history = model.fit(X_train,Y_train,batch_size=64, epochs=20, validation_data=(X_test,Y_test), shuffle=True)
+    history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
     train_forecast = model(X_train).numpy()
 
     
@@ -305,9 +305,10 @@ for i in range(splitting_traintest):
 
     ###metric_train_pre.append(mean_squared_error(Y_train, train_forecast_pre))
 
-    metric_train.append(mean_squared_error(Y_train_denorm, train_forecast, squared=False))
 
-    metric_test.append(mean_squared_error(Y_test_denorm, test_forecast, squared=False))
+    metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
+
+    metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
 
     train_loss = history.history['loss']
     test_loss = history.history['val_loss']
@@ -324,7 +325,13 @@ for i in range(splitting_traintest):
         plt.show()
 
 ###print("Initial Guess ",metric_train_pre)
-metric_train = [np.format_float_scientific(m, precision=2) for m in metric_train]
-print("Training RMSE",metric_train)
-metric_test = [np.format_float_scientific(m, precision=2) for m in metric_test]
-print("Test RMSE",metric_test)
+m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
+print("Training RMSE",m_train)
+m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
+print("Test RMSE",m_test)
+
+m_train = [m[1]*100 for m in metric_train]
+print("Training MAPE",m_train)
+m_test = [m[1]*100 for m in metric_test]
+print("Test MAPE",m_test)
+

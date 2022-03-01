@@ -155,46 +155,57 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     plt.savefig("plot3.png")
     return 
 
-## Loading Files 
-InOrOut = "OutLoop"
-#InOrOut = "InLoop" 
-#camFit = np.load("data/"+InOrOut+"/CameraFit.npy")    #Y
-#camProj = np.load("data/"+InOrOut+"/CameraProj.npy")  #Y
-OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
-OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
-ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X 
-ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
-laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
-laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
-Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
+def loading(InOrOut):
+    OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
+    OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
+    ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X 
+    ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
+    laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
+    laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
+    Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
+    cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
+    cam = cam['saveData']
+    cam = cam[:,1]
+    return OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam
 
 
-cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
-cam = cam['saveData']
-cam = cam[:,1]
-##SplittingRatio ML 
-percentage = 80 #-- Train
+#InLoop
+OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
+percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
 forecast_horizon = 1
-normalization_method = 'zscore'
-
+normalization_method = 'minmax'
 targetShift = -2
-fetureSelection = 1
-shouldIplot = 1
+fetureSelection = 0
+shouldIplot = 0
+
+loadboth = 0
 
 data_ln = len(cam)
 # SHIFT
 if (targetShift!=0):
-    cam = np.roll(cam, targetShift)
+    cam = np.roll(cam,targetShift)
     cam  = cam[:targetShift]
     OL_phs = OL_phs[:targetShift]
     OL_amp = OL_amp[:targetShift]
     ILmOL_phs = ILmOL_phs[:targetShift]
     ILmOL_amp = ILmOL_amp[:targetShift]
     laser_Phs = laser_Phs[:targetShift]
-    laser_amp = laser_amp[:targetShift]    
+    laser_amp = laser_amp[:targetShift]
     Egain = Egain[:targetShift]
+
+if loadboth:
+    OL_phs1,OL_amp1,ILmOL_phs1,ILmOL_amp1,laser_Phs1,laser_amp1,Egain1,cam1 = loading(InOrOut = "InLoop")
+    OL_phs = np.concatenate((OL_phs, OL_phs1), axis = 0)
+    OL_amp = np.concatenate((OL_amp, OL_amp1), axis = 0)
+    ILmOL_phs = np.concatenate((ILmOL_phs, ILmOL_phs1), axis = 0)
+    ILmOL_amp = np.concatenate((ILmOL_amp, ILmOL_amp1), axis = 0)
+    laser_Phs = np.concatenate((laser_Phs, laser_Phs1), axis = 0)
+    laser_amp = np.concatenate((laser_amp, laser_amp1), axis = 0)
+    Egain = np.concatenate((Egain, Egain1), axis = 0)
+    cam = np.concatenate((cam, cam1), axis = 0)
+    data_ln = len(cam)
 
 if fetureSelection:
     # Selected variables
@@ -203,8 +214,7 @@ else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-
-splitting_traintest = 1
+splitting_traintest = 2
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 

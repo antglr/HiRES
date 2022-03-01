@@ -130,7 +130,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
 
-    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
+    fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(14,7))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
     ax1.plot(train_forecast,"k",label= "Prediction")
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -150,6 +150,15 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.grid(axis="y")
     ax2.set_ylim((minimo, massimo))
     ax2.legend()
+    ax3.plot(np.abs(np.squeeze(Y_test)-test_forecast),"k")
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    M = np.mean(np.abs(np.squeeze(Y_test)-test_forecast))
+    ax3.axhline(y=M, color='k', linestyle='-',label= str(M))
+    ax3.set_ylabel("|Label-Prediction|")
+    ax3.set_xlabel("Time")
+    ax3.grid(axis="x")
+    ax3.grid(axis="y")
+    ax3.legend()
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
     plt.savefig("plot3.png")
     return 
@@ -167,34 +176,33 @@ def plot_feature_importances(model, feature_names, X_train, past_history):
     # fig.tight_layout()
     plt.savefig("feats_ph{}_bis.png".format(past_history))
 
+def loading(InOrOut):
+    OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
+    OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
+    ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X 
+    ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
+    laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
+    laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
+    Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
+    cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
+    cam = cam['saveData']
+    cam = cam[:,1]
+    return OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam
 
-## Loading Files 
-InOrOut = "OutLoop"
-# InOrOut = "InLoop" 
-#camFit = np.load("data/"+InOrOut+"/CameraFit.npy")    #Y
-#camProj = np.load("data/"+InOrOut+"/CameraProj.npy")  #Y
-OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
-OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
-ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X 
-ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
-laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
-laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
-Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
 
 
-cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
-cam = cam['saveData']
-cam = cam[:,1]
-##SplittingRatio ML 
-percentage = 80 #-- Train
+#InLoop
+OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
+percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
 forecast_horizon = 1
-normalization_method = 'zscore'
-
+normalization_method = 'minmax'
 targetShift = -2
-fetureSelection = 1
-shouldIplot = 1
+fetureSelection = 0
+shouldIplot = 0
+
+loadboth = 0
 
 data_ln = len(cam)
 # SHIFT
@@ -209,6 +217,18 @@ if (targetShift!=0):
     laser_amp = laser_amp[:targetShift]
     Egain = Egain[:targetShift]
 
+if loadboth:
+    OL_phs1,OL_amp1,ILmOL_phs1,ILmOL_amp1,laser_Phs1,laser_amp1,Egain1,cam1 = loading(InOrOut = "InLoop")
+    OL_phs = np.concatenate((OL_phs, OL_phs1), axis = 0)
+    OL_amp = np.concatenate((OL_amp, OL_amp1), axis = 0)
+    ILmOL_phs = np.concatenate((ILmOL_phs, ILmOL_phs1), axis = 0)
+    ILmOL_amp = np.concatenate((ILmOL_amp, ILmOL_amp1), axis = 0)
+    laser_Phs = np.concatenate((laser_Phs, laser_Phs1), axis = 0)
+    laser_amp = np.concatenate((laser_amp, laser_amp1), axis = 0)
+    Egain = np.concatenate((Egain, Egain1), axis = 0)
+    cam = np.concatenate((cam, cam1), axis = 0)
+    data_ln = len(cam)
+
 if fetureSelection:
     # Selected variables
     FullDataset = np.array([cam, OL_amp, OL_phs]) 
@@ -222,7 +242,7 @@ feature_names = ['Cam',  'RF A', 'RF P']
 
 
 
-splitting_traintest = 1
+splitting_traintest = 2
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 
@@ -251,7 +271,7 @@ for i in range(splitting_traintest):
     X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
     X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    # model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    #model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
     # model = XGBRegressor(n_estimators=100, max_depth=7, eta=0.1, subsample=0.7, colsample_bytree=0.8, n_jobs=-1)
     # model = LinearRegression()
     model = MLPRegressor(hidden_layer_sizes=[256, 128, 64, 32, 16, 8], random_state=1, max_iter=1000)

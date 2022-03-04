@@ -122,7 +122,8 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.grid(axis="x")
     ax2.grid(axis="y")
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
-    plt.savefig("plot2.png")
+    save_name = "plot2_" +str(i) + ".png"
+    plt.savefig(save_name)
     return 
 
 def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
@@ -159,7 +160,8 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax3.grid(axis="y")
     ax3.legend()
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
-    plt.savefig("plot3.png")
+    save_name = "plot3_" +str(i) + ".png"
+    plt.savefig(save_name)
     return 
 
 def plot_feature_importances(model, feature_names, X_train, past_history):

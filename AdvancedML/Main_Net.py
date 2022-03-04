@@ -124,7 +124,8 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.grid(axis="x")
     ax2.grid(axis="y")
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
-    plt.savefig("plot2.png")
+    save_name = "plot2_" +str(i) + ".png"
+    plt.savefig(save_name)
     return 
 
 def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
@@ -152,7 +153,8 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.set_ylim((minimo, massimo))
     ax2.legend()
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
-    plt.savefig("plot3.png")
+    save_name = "plot3_" +str(i) + ".png"
+    plt.savefig(save_name)
     return 
 
 def loading(InOrOut):
@@ -170,6 +172,7 @@ def loading(InOrOut):
 
 
 #InLoop
+#OutLoop
 OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
 percentage = 80 
 fit_or_proj = "fit" 
@@ -214,7 +217,7 @@ else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-splitting_traintest = 1
+splitting_traintest = 2
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 
@@ -291,10 +294,8 @@ for i in range(splitting_traintest):
     train_forecast_pre = model(X_train).numpy()
     #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=True, callbacks=[callback])
     history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
-    train_forecast = model(X_train).numpy()
-
     
-
+    train_forecast = model(X_train).numpy()
     Y_train_denorm = np.zeros(Y_train.shape)
     for j in range(Y_train.shape[0]):
         nparams = norm_params[0]
@@ -316,18 +317,19 @@ for i in range(splitting_traintest):
                 x_cam_last = np.squeeze(np.array(test_forecast[-len(test_forecast):]),1)
                 n_value_neede = past_history - len(test_forecast)
                 x_cam_first =  X_test2[k, :n_value_neede, 0]
+                x_cam_last = np.array(x_cam_last).reshape(-1,)
                 x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) #Check concatenation axis
             x_external = X_test2[k,:,1:]
             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
-            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
-            local_forecast = model.predict(new_X_test)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
+            local_forecast = model(new_X_test)
             test_forecast.append(local_forecast)
         else:
             x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
             x_external = X_test2[k,:,1:]
-            new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
-            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
-            local_forecast = model.predict(new_X_test)
+            new_X_test = np.concatenate((x_cam,x_external),axis=1)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
+            local_forecast = model(new_X_test)
             test_forecast.append(local_forecast)
 
     Y_test_denorm = np.zeros(Y_test.shape)
@@ -340,7 +342,6 @@ for i in range(splitting_traintest):
 
 
     metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
-
     metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
 
     train_loss = history.history['loss']
@@ -367,4 +368,3 @@ m_train = [m[1]*100 for m in metric_train]
 print("Training MAPE",m_train)
 m_test = [m[1]*100 for m in metric_test]
 print("Test MAPE",m_test)
-

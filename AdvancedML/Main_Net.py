@@ -303,7 +303,32 @@ for i in range(splitting_traintest):
     train_forecast = np.squeeze(train_forecast)
     metrics_train = np.abs(train_forecast-np.squeeze(Y_train_denorm))
 
-    test_forecast = model(X_test).numpy()
+    #test_forecast = model.predict(X_test)
+    test_forecast = []
+    X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))
+    for k in range(len(X_test)):        
+        if (len(test_forecast)<past_history):
+            if (len(test_forecast)==0):
+                n_value_neede = past_history
+                x_cam_first =  X_test2[k, :n_value_neede, 0]
+                x_cam = x_cam_first #Check concatenation axis
+            else:
+                x_cam_last = np.squeeze(np.array(test_forecast[-len(test_forecast):]),1)
+                n_value_neede = past_history - len(test_forecast)
+                x_cam_first =  X_test2[k, :n_value_neede, 0]
+                x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) #Check concatenation axis
+            x_external = X_test2[k,:,1:]
+            new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            local_forecast = model.predict(new_X_test)
+            test_forecast.append(local_forecast)
+        else:
+            x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
+            x_external = X_test2[k,:,1:]
+            new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            local_forecast = model.predict(new_X_test)
+            test_forecast.append(local_forecast)
 
     Y_test_denorm = np.zeros(Y_test.shape)
     for j in range(Y_test.shape[0]):
@@ -312,8 +337,6 @@ for i in range(splitting_traintest):
         Y_test_denorm[j] = denormalize(Y_test[j], nparams, normalization_method)
     test_forecast = np.squeeze(test_forecast)
     metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
-
-    ###metric_train_pre.append(mean_squared_error(Y_train, train_forecast_pre))
 
 
     metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])

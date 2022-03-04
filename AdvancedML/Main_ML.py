@@ -129,7 +129,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
 
-    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
+    fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(16,6))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
     ax1.plot(train_forecast,"k",label= "Prediction")
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -198,7 +198,7 @@ forecast_horizon = 1
 normalization_method = 'zscore'
 targetShift = -2
 fetureSelection = 1
-shouldIplot = 0
+shouldIplot = 1
 
 loadboth = 0
 
@@ -234,13 +234,12 @@ else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-
 # feature_names = ['Cam', 'RF P', 'RF A', 'RF PD', 'RF AD', 'Laser P', 'Laser A']
 feature_names = ['Cam',  'RF A', 'RF P']
 
 
 
-splitting_traintest = 2
+splitting_traintest = 1
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 
@@ -287,7 +286,32 @@ for i in range(splitting_traintest):
     train_forecast = np.squeeze(train_forecast)
     metrics_train = np.abs(train_forecast-np.squeeze(Y_train_denorm))
 
-    test_forecast = model.predict(X_test)
+    #test_forecast = model.predict(X_test)
+    test_forecast = []
+    X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))
+    for k in range(len(X_test)):        
+        if (len(test_forecast)<past_history):
+            if (len(test_forecast)==0):
+                n_value_neede = past_history
+                x_cam_first =  X_test2[k, :n_value_neede, 0]
+                x_cam = x_cam_first #Check concatenation axis
+            else:
+                x_cam_last = np.squeeze(np.array(test_forecast[-len(test_forecast):]),1)
+                n_value_neede = past_history - len(test_forecast)
+                x_cam_first =  X_test2[k, :n_value_neede, 0]
+                x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) #Check concatenation axis
+            x_external = X_test2[k,:,1:]
+            new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            local_forecast = model.predict(new_X_test)
+            test_forecast.append(local_forecast)
+        else:
+            x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
+            x_external = X_test2[k,:,1:]
+            new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
+            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            local_forecast = model.predict(new_X_test)
+            test_forecast.append(local_forecast)
 
     Y_test_denorm = np.zeros(Y_test.shape)
     for j in range(Y_test.shape[0]):
@@ -306,7 +330,6 @@ for i in range(splitting_traintest):
     if shouldIplot:
         plt.show()
 
-###print("Initial Guess ",metric_train_pre)
 m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
 print("Training RMSE",m_train)
 m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]

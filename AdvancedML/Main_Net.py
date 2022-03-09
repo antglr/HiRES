@@ -131,8 +131,9 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
 def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
+    shift = 0
 
-    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
+    fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(16,6))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
     ax1.plot(train_forecast,"k",label= "Prediction")
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -143,7 +144,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax1.set_ylim((minimo, massimo))
     ax1.legend()
     ax2.plot(np.squeeze(Y_test),"r",label= "Label")
-    ax2.plot(test_forecast,"k",label= "Prediction")
+    ax2.plot(np.roll(test_forecast,shift),"k",label= "Prediction")
     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax2.set_ylabel("Centroid Error")
     ax2.set_xlabel("Time")
@@ -152,6 +153,16 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.grid(axis="y")
     ax2.set_ylim((minimo, massimo))
     ax2.legend()
+    #ax3.plot(np.squeeze(Y_train) - train_forecast, "g", label= "Train")
+    ax3.plot(np.squeeze(Y_test) - np.roll(test_forecast,shift), "b", label= "Test")
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax3.set_ylabel("(Real Dataser - Prediction)")
+    ax3.set_xlabel("Time")
+    ax3.grid(axis="x")
+    ax3.grid(axis="y")
+    ax3.legend()
+    ax3.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
+
     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
     save_name = "plot3_" +str(i) + ".png"
     plt.savefig(save_name)
@@ -173,7 +184,7 @@ def loading(InOrOut):
 
 #InLoop
 #OutLoop
-OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
+OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop")
 percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
@@ -217,13 +228,22 @@ else:
     # All variables
     FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-splitting_traintest = 2
+splitting_traintest = 1
 traintest_size = data_ln//splitting_traintest
 split = int(traintest_size*percentage/100)
 
 metric_train = []
 metric_test = []
 metric_train_pre = []
+
+std_train = []
+perc_variation_train = []
+std_diff_train = []
+perc_variation_diff_train = []
+std_test = []
+perc_variation_test = []
+std_diff_test = []
+perc_variation_diff_test = []
 print("")
 print("Dataset length:",data_ln)
 for i in range(splitting_traintest):
@@ -340,6 +360,19 @@ for i in range(splitting_traintest):
     test_forecast = np.squeeze(test_forecast)
     metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
 
+    #NEW STD STUFF
+    #train
+    std_train.append(np.std(Y_train_denorm))
+    perc_variation_train.append(np.std(Y_train_denorm)/np.mean(Y_train_denorm))
+    diff_train = np.abs(Y_train_denorm - train_forecast)
+    std_diff_train.append(np.std(diff_train))
+    perc_variation_diff_train.append(np.std(diff_train)/np.mean(diff_train))
+    #test
+    std_test.append(np.std(Y_test_denorm))
+    perc_variation_test.append(np.std(Y_test_denorm)/np.mean(Y_test_denorm))
+    diff_test = np.abs(Y_test_denorm - test_forecast)
+    std_diff_test.append(np.std(diff_test))
+    perc_variation_diff_test.append(np.std(diff_test)/np.mean(diff_test))
 
     metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
     metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
@@ -359,12 +392,42 @@ for i in range(splitting_traintest):
         plt.show()
 
 ###print("Initial Guess ",metric_train_pre)
-m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
-print("Training RMSE",m_train)
-m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
-print("Test RMSE",m_test)
+# m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
+# print("Training RMSE",m_train)
+# m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
+# print("Test RMSE",m_test)
 
-m_train = [m[1]*100 for m in metric_train]
-print("Training MAPE",m_train)
-m_test = [m[1]*100 for m in metric_test]
-print("Test MAPE",m_test)
+# m_train = [m[1]*100 for m in metric_train]
+# print("Training MAPE",m_train)
+# m_test = [m[1]*100 for m in metric_test]
+# print("Test MAPE",m_test)
+
+
+sci_std_train = [np.format_float_scientific(m, precision=2) for m in std_train]
+sci_perc_variation_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_train]
+sci_std_diff_train = [np.format_float_scientific(m, precision=2) for m in std_diff_train]
+sci_perc_variation_diff_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_train]
+
+sci_std_test = [np.format_float_scientific(m, precision=2) for m in std_test]
+sci_perc_variation_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_test]
+sci_std_diff_test = [np.format_float_scientific(m, precision=2) for m in std_diff_test]
+sci_perc_variation_diff_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_test]
+
+print("-----------------------------------------------------------------------------")
+print("Train:")
+print("STD RealDataser ----------------------------------->",sci_std_train)
+print("Percentade Variation RealDataser ------------------>",sci_perc_variation_train)
+print("STD (RealDataser - Prediction) -------------------->", sci_std_diff_train)
+print("Percentade Variation (RealDataser - Prediction): -->",sci_perc_variation_diff_train)
+print("-----------------------------------------------------------------------------")
+print("")
+print("")
+print("Test:")
+print("STD RealDataser ----------------------------------->",sci_std_test)
+print("Percentade Variation RealDataser  ----------------->",sci_perc_variation_test)
+print("STD (RealDataser - Prediction)  ------------------->", sci_std_diff_test)
+print("Percentade Variation (RealDataser - Prediction)  -->",sci_perc_variation_diff_test)
+print("-----------------------------------------------------------------------------")
+
+
+    

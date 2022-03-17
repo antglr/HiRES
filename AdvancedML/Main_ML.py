@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-# matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from sklearn.ensemble import RandomForestRegressor

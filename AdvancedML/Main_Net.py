@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib
-#matplotlib.use("Agg")
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
 from sklearn.ensemble import RandomForestRegressor
@@ -10,6 +10,7 @@ from sklearn.model_selection import TimeSeriesSplit
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+import tensorflow.keras.backend as K
 import scipy.io as sio
 import pandas as pd
 
@@ -128,7 +129,7 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     plt.savefig(save_name)
     return 
 
-def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
+def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
     shift = 0
@@ -155,15 +156,25 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.legend()
     #ax3.plot(np.squeeze(Y_train) - train_forecast, "g", label= "Train")
     ax3.plot(np.squeeze(Y_test) - np.roll(test_forecast,shift), "b", label= "Test")
-    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-    ax3.set_ylabel("(Real Dataser - Prediction)")
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    M = np.mean(np.abs(np.squeeze(Y_test)-test_forecast))
+    S = np.std(np.abs(np.squeeze(Y_test)-test_forecast))
+
+    ax3.axhline(y=M, color='k', linestyle='-',label= "Mean:{}".format(np.format_float_scientific(M, precision=2)))
+    ax3.axhline(y=M, color='g', linestyle='-',label= "Std:{}".format(np.format_float_scientific(S, precision=2)))
+
+    rmse = np.format_float_scientific(mean_squared_error(Y_test, test_forecast, squared=False), precision=2)
+    mape = mean_absolute_percentage_error(Y_test, test_forecast)*100
+    
+    ax3.set_ylabel("(Real Dataset - Prediction)")
     ax3.set_xlabel("Time")
     ax3.grid(axis="x")
     ax3.grid(axis="y")
     ax3.legend()
     ax3.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
 
-    plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
+    plt.suptitle('{} SubSet -->{}'.format(type(model).__name__,i+1), fontsize=20)
+    plt.title('RMSE Test: {0:}\nMAPE Test: {1:.4}'.format(rmse,mape), loc='right')
     save_name = "plot3_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
@@ -183,8 +194,7 @@ def loading(InOrOut):
 
 
 #InLoop
-#OutLoop
-OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop")
+OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
 percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
@@ -264,44 +274,57 @@ for i in range(splitting_traintest):
     print(np.shape(X_test))
     print(np.shape(X_train))    
     
-    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    # x = tf.keras.layers.LSTM(units=300, return_sequences=True, dropout=0.1)(inputs)
-    x = tf.keras.layers.LSTM(units=300, return_sequences=False, dropout=0.1)(inputs)
-    x = tf.keras.layers.Flatten()(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(256, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(128, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(64, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    # x = tf.keras.layers.Dense(32, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(16, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(forecast_horizon)(x)
-    model = tf.keras.Model(inputs=inputs, outputs=x)
+    def lstm():
+        inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+        x = tf.keras.layers.LSTM(units=300, return_sequences=False)(inputs)
+        # x = tf.keras.layers.Conv1D(64, 3, activation="relu", padding="same")(inputs)
+        x = tf.keras.layers.Flatten()(x)
+        # x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.Dense(256, activation='relu')(x)
+        # x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.Dense(128, activation='relu')(x)
+        # x = tf.keras.layers.Dropout(0.1)(x)
+        x = tf.keras.layers.Dense(64, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.Dense(32, activation='relu')(x)
+        # x = tf.keras.layers.Dropout(0.1)(x)
+        x = tf.keras.layers.Dense(16, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        x = tf.keras.layers.Dense(forecast_horizon)(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        
+        return model
     
-    # x = tf.keras.layers.Flatten()(inputs)
-    # x = tf.keras.layers.Dense(512, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(64, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(32, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(16, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(8, activation='relu')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    # # x = tf.keras.layers.BatchNormalization()(x)f
-    # x = tf.keras.layers.Dense(forecast_horizon)(x)
-    # model = tf.keras.Model(inputs=inputs, outputs=x)
     
+    def mlp():
+        # MLP
+        inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+
+        x = tf.keras.layers.Flatten()(inputs)
+        x = tf.keras.layers.Dense(512, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dense(64, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dense(32, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dense(16, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.BatchNormalization()(x)
+        x = tf.keras.layers.Dense(8, activation='relu')(x)
+        x = tf.keras.layers.Dropout(0.1)(x)
+        # x = tf.keras.layers.BatchNormalization()(x)f
+        x = tf.keras.layers.Dense(forecast_horizon)(x)
+        model = tf.keras.Model(inputs=inputs, outputs=x)
+        return model
+    
+    def root_mean_squared_error(y_true, y_pred):
+        return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
+    
+    model = lstm()
+    # model = mlp()
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
     # lr_schedule = keras.optimizers.schedules.ExponentialDecay(
     #     initial_learning_rate=1e-2,
@@ -364,13 +387,13 @@ for i in range(splitting_traintest):
     #train
     std_train.append(np.std(Y_train_denorm))
     perc_variation_train.append(np.std(Y_train_denorm)/np.mean(Y_train_denorm))
-    diff_train = np.abs(Y_train_denorm - train_forecast)
+    diff_train = np.abs(np.squeeze(Y_train_denorm) - train_forecast)
     std_diff_train.append(np.std(diff_train))
     perc_variation_diff_train.append(np.std(diff_train)/np.mean(diff_train))
     #test
     std_test.append(np.std(Y_test_denorm))
     perc_variation_test.append(np.std(Y_test_denorm)/np.mean(Y_test_denorm))
-    diff_test = np.abs(Y_test_denorm - test_forecast)
+    diff_test = np.abs(np.squeeze(Y_test_denorm) - test_forecast)
     std_diff_test.append(np.std(diff_test))
     perc_variation_diff_test.append(np.std(diff_test)/np.mean(diff_test))
 
@@ -387,20 +410,19 @@ for i in range(splitting_traintest):
     plt.legend()
     plt.savefig("loss_curves.png")
     plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, model)
     if shouldIplot:
         plt.show()
 
-###print("Initial Guess ",metric_train_pre)
-# m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
-# print("Training RMSE",m_train)
-# m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
-# print("Test RMSE",m_test)
+m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
+print("Training RMSE",m_train)
+m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
+print("Test RMSE",m_test)
 
-# m_train = [m[1]*100 for m in metric_train]
-# print("Training MAPE",m_train)
-# m_test = [m[1]*100 for m in metric_test]
-# print("Test MAPE",m_test)
+m_train = [m[1]*100 for m in metric_train]
+print("Training MAPE",m_train)
+m_test = [m[1]*100 for m in metric_test]
+print("Test MAPE",m_test)
 
 
 sci_std_train = [np.format_float_scientific(m, precision=2) for m in std_train]
@@ -428,6 +450,3 @@ print("Percentade Variation RealDataser  ----------------->",sci_perc_variation_
 print("STD (RealDataser - Prediction)  ------------------->", sci_std_diff_test)
 print("Percentade Variation (RealDataser - Prediction)  -->",sci_perc_variation_diff_test)
 print("-----------------------------------------------------------------------------")
-
-
-    

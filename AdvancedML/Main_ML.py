@@ -126,9 +126,10 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     plt.savefig(save_name)
     return 
 
-def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
+def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
+    shift = 0
 
     fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(16,6))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
@@ -141,7 +142,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax1.set_ylim((minimo, massimo))
     ax1.legend()
     ax2.plot(np.squeeze(Y_test),"r",label= "Label")
-    ax2.plot(test_forecast,"k",label= "Prediction")
+    ax2.plot(np.roll(test_forecast,shift),"k",label= "Prediction")
     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax2.set_ylabel("Centroid Error")
     ax2.set_xlabel("Time")
@@ -149,17 +150,28 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i):
     ax2.grid(axis="x")
     ax2.grid(axis="y")
     ax2.set_ylim((minimo, massimo))
-    ax2.legend()
-    ax3.plot(np.abs(np.squeeze(Y_test)-test_forecast),"k")
+    ax2.legend()    
+    #ax3.plot(np.squeeze(Y_train) - train_forecast, "g", label= "Train")
+    ax3.plot(np.squeeze(Y_test) - np.roll(test_forecast,shift), "b", label= "Test")
     ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     M = np.mean(np.abs(np.squeeze(Y_test)-test_forecast))
-    ax3.axhline(y=M, color='k', linestyle='-',label= str(M))
-    ax3.set_ylabel("|Label-Prediction|")
+    S = np.std(np.abs(np.squeeze(Y_test)-test_forecast))
+
+    ax3.axhline(y=M, color='k', linestyle='-',label= "Mean:{}".format(np.format_float_scientific(M, precision=2)))
+    ax3.axhline(y=M, color='g', linestyle='-',label= "Std:{}".format(np.format_float_scientific(S, precision=2)))
+
+    rmse = np.format_float_scientific(mean_squared_error(Y_test, test_forecast, squared=False), precision=2)
+    mape = mean_absolute_percentage_error(Y_test, test_forecast)*100
+    
+    ax3.set_ylabel("(Real Dataset - Prediction)")
     ax3.set_xlabel("Time")
     ax3.grid(axis="x")
     ax3.grid(axis="y")
-    ax3.legend()
-    plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
+    ax3.legend() 
+    ax3.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
+
+    plt.suptitle('{} SubSet -->{}'.format(type(model).__name__,i+1), fontsize=20)
+    plt.title('RMSE Test: {0:}\nMAPE Test: {1:.4}'.format(rmse,mape), loc='right')
     save_name = "plot3_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
@@ -192,7 +204,7 @@ def loading(InOrOut):
 
 
 #InLoop
-OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
+OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop")
 percentage = 80 
 fit_or_proj = "fit" 
 past_history = 30
@@ -200,7 +212,7 @@ forecast_horizon = 1
 normalization_method = 'zscore'
 targetShift = -2
 fetureSelection = 1
-shouldIplot = 1
+shouldIplot = 0
 
 loadboth = 0
 
@@ -248,6 +260,15 @@ split = int(traintest_size*percentage/100)
 metric_train = []
 metric_test = []
 metric_train_pre = []
+
+std_train = []
+perc_variation_train = []
+std_diff_train = []
+perc_variation_diff_train = []
+std_test = []
+perc_variation_test = []
+std_diff_test = []
+perc_variation_diff_test = []
 print("")
 print("Dataset length:",data_ln)
 for i in range(splitting_traintest):
@@ -270,10 +291,10 @@ for i in range(splitting_traintest):
     X_train = X_train.reshape(X_train.shape[0], X_train.shape[1] * X_train.shape[2])
     X_test = X_test.reshape(X_test.shape[0], X_test.shape[1] * X_test.shape[2])
     
-    #model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
+    model = RandomForestRegressor(criterion='mse', n_jobs=-1, n_estimators=100, max_depth=10,min_samples_split=2,min_samples_leaf=3)
     # model = XGBRegressor(n_estimators=100, max_depth=7, eta=0.1, subsample=0.7, colsample_bytree=0.8, n_jobs=-1)
     # model = LinearRegression()
-    model = MLPRegressor(hidden_layer_sizes=[256, 128, 64, 32, 16, 8], random_state=1, max_iter=1000)
+    # model = MLPRegressor(hidden_layer_sizes=[256, 128, 64, 32, 16, 8], random_state=1, max_iter=1000)
     model.fit(X_train,Y_train)
     train_forecast = model.predict(X_train)
     # plot_feature_importances(model, feature_names, X_train, past_history)
@@ -306,6 +327,8 @@ for i in range(splitting_traintest):
             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
             new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
             local_forecast = model.predict(new_X_test)
+            if len(local_forecast.shape) > 1:
+                local_forecast = np.squeeze(local_forecast, 1)
             test_forecast.append(local_forecast)
         else:
             x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
@@ -313,6 +336,8 @@ for i in range(splitting_traintest):
             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
             new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
             local_forecast = model.predict(new_X_test)
+            if len(local_forecast.shape) > 1:
+                local_forecast = np.squeeze(local_forecast, 1)
             test_forecast.append(local_forecast)
 
     Y_test_denorm = np.zeros(Y_test.shape)
@@ -323,12 +348,25 @@ for i in range(splitting_traintest):
     test_forecast = np.squeeze(test_forecast)
     metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
 
-    metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
+    #NEW STD STUFF
+    #train
+    std_train.append(np.std(Y_train_denorm))
+    perc_variation_train.append(np.std(Y_train_denorm)/np.mean(Y_train_denorm))
+    diff_train = np.abs(np.squeeze(Y_train_denorm) - train_forecast)
+    std_diff_train.append(np.std(diff_train))
+    perc_variation_diff_train.append(np.std(diff_train)/np.mean(diff_train))
+    #test
+    std_test.append(np.std(Y_test_denorm))
+    perc_variation_test.append(np.std(Y_test_denorm)/np.mean(Y_test_denorm))
+    diff_test = np.abs(np.squeeze(Y_test_denorm) - test_forecast)
+    std_diff_test.append(np.std(diff_test))
+    perc_variation_diff_test.append(np.std(diff_test)/np.mean(diff_test))
 
+    metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
     metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
 
     plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, model)
     if shouldIplot:
         plt.show()
 
@@ -342,3 +380,29 @@ print("Training MAPE",m_train)
 m_test = [m[1]*100 for m in metric_test]
 print("Test MAPE",m_test)
 
+
+sci_std_train = [np.format_float_scientific(m, precision=2) for m in std_train]
+sci_perc_variation_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_train]
+sci_std_diff_train = [np.format_float_scientific(m, precision=2) for m in std_diff_train]
+sci_perc_variation_diff_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_train]
+
+sci_std_test = [np.format_float_scientific(m, precision=2) for m in std_test]
+sci_perc_variation_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_test]
+sci_std_diff_test = [np.format_float_scientific(m, precision=2) for m in std_diff_test]
+sci_perc_variation_diff_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_test]
+
+print("-----------------------------------------------------------------------------")
+print("Train:")
+print("STD RealDataser ----------------------------------->",sci_std_train)
+print("Percentade Variation RealDataser ------------------>",sci_perc_variation_train)
+print("STD (RealDataser - Prediction) -------------------->", sci_std_diff_train)
+print("Percentade Variation (RealDataser - Prediction): -->",sci_perc_variation_diff_train)
+print("-----------------------------------------------------------------------------")
+print("")
+print("")
+print("Test:")
+print("STD RealDataser ----------------------------------->",sci_std_test)
+print("Percentade Variation RealDataser  ----------------->",sci_perc_variation_test)
+print("STD (RealDataser - Prediction)  ------------------->", sci_std_diff_test)
+print("Percentade Variation (RealDataser - Prediction)  -->",sci_perc_variation_diff_test)
+print("-----------------------------------------------------------------------------")

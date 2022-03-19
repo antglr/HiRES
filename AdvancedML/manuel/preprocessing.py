@@ -5,10 +5,9 @@ import scipy.io as sio
 
 def read_data(normalization_method, past_history_factor):
     ## Loading Files 
-    InOrOut = "OutLoop"
-    # InOrOut = "InLoop" 
-    # camFit = np.load("../data/"+InOrOut+"/CameraFit.npy")    
-    # camProj = np.load("../data/"+InOrOut+"/CameraProj.npy")  
+    # InOrOut = "OutLoop"
+    InOrOut = "InLoop" 
+    
     OL_phs = np.load("../data/"+InOrOut+"/OL_Phase.npy")     
     OL_amp = np.load("../data/"+InOrOut+"/OL_Magnitude.npy") 
     ILmOL_phs = np.load("../data/"+InOrOut+"/OL_Phase.npy") - np.load("../data/"+InOrOut+"/IL_Phase.npy") 

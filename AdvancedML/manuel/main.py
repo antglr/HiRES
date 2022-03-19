@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use("Agg")
 import os
 import argparse
 import json
@@ -86,6 +88,7 @@ def _run_experiment(
     training_time = time.time() - training_time_0
     
     train_forecast = model(x_train).numpy()
+    # train_forecast_stream = forecast(model, x_train, past_history, 3)
     
     for i in range(train_forecast.shape[0]):
         nparams = norm_params[index_target_series]    # The index_target_series has to match the index of cam variable
@@ -96,13 +99,17 @@ def _run_experiment(
     # Get validation metrics
     test_time_0 = time.time()
     test_forecast = model(x_test).numpy()
+    test_forecast_stream =  forecast(model, x_test.numpy(), past_history, 3)
     test_time = time.time() - test_time_0
 
     for i in range(test_forecast.shape[0]):
         nparams = norm_params[index_target_series]
         test_forecast[i] = denormalize(
             test_forecast[i], nparams, method=normalization_method,
-    )
+        )
+        test_forecast_stream[i] = denormalize(
+            test_forecast_stream[i], nparams, method=normalization_method,
+        )
         
     if metrics:
         print(y_train_denorm.numpy().shape)
@@ -111,7 +118,9 @@ def _run_experiment(
         train_metrics = {k + "_train": v for k,v in train_metrics.items()}
         test_metrics = evaluate(np.expand_dims(y_test_denorm.numpy().squeeze(1), 0), np.expand_dims(test_forecast.squeeze(1), 0), metrics)
         test_metrics = {k + "_test": v for k,v in test_metrics.items()}
-
+        test_stream_metrics = evaluate(np.expand_dims(y_test_denorm.numpy().squeeze(1), 0), np.expand_dims(test_forecast_stream, 0), metrics)
+        test_stream_metrics = {k + "_test_stream": v for k,v in test_stream_metrics.items()}
+                    
     else:
         train_metrics = {}
         test_metrics = {}
@@ -154,6 +163,7 @@ def _run_experiment(
             "TRAINING_TIME": training_time,
             **train_metrics,
             **test_metrics,
+            **test_stream_metrics,
             "LOSS": str(history.history["loss"]),
             "VAL_LOSS": str(history.history["val_loss"]),
         },
@@ -170,6 +180,34 @@ def _run_experiment(
     gc.collect()
     del model, x_train, x_test, y_train, y_test, test_forecast, y_train_denorm, y_test_denorm
 
+def forecast(model, X, past_history, n_variables):
+    forecast = []
+    X2 = X.reshape(X.shape[0], past_history, n_variables)
+    for k in range(len(X)):        
+        if (len(forecast)<past_history):
+            if (len(forecast)==0):
+                n_value_neede = past_history
+                x_cam_first =  X2[k, :n_value_neede, 0]
+                x_cam = x_cam_first #Check concatenation axis
+            else:
+                x_cam_last = np.squeeze(np.array(forecast[-len(forecast):]),1)
+                n_value_neede = past_history - len(forecast)
+                x_cam_first =  X2[k, :n_value_neede, 0]
+                x_cam_last = np.array(x_cam_last).reshape(-1,)
+                x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) #Check concatenation axis
+            x_external = X2[k,:,1:]
+            new_X = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
+            new_X = new_X.reshape(1, new_X.shape[0] , new_X.shape[1])
+            local_forecast = model(new_X).numpy()
+            forecast.append(local_forecast)
+        else:
+            x_cam = np.squeeze(np.array(forecast[-past_history:]),1)
+            x_external = X2[k,:,1:]
+            new_X = np.concatenate((x_cam,x_external),axis=1)
+            new_X = new_X.reshape(1, new_X.shape[0] , new_X.shape[1])
+            local_forecast = model(new_X).numpy()
+            forecast.append(local_forecast)
+    return np.array(forecast).squeeze(1).squeeze(1)
 
 def run_experiment(
         error_dict,
@@ -254,6 +292,7 @@ def main(args):
             )
         ]
     )
+    print("Num total", num_total_experiments)
     
 
 
@@ -308,18 +347,18 @@ if __name__ == "__main__":
         "-m",
         "--models",
         nargs="*",
-        default=[],
+        default=['lstm','cnn','mlp'],
         help="Models to experiment over (separated by comma)",
     )
     parser.add_argument(
         "-ml",
         "--models_ml",
         nargs="*",
-        default=[],
+        default=['rf', 'lr'],
         help="ML Models to experiment over (separated by comma)",
     )
     parser.add_argument(
-        "-p", "--parameters", help="Parameters file path",
+        "-p", "--parameters", help="Parameters file path", default='manuel/parameters_full2.json',
     )
     parser.add_argument(
         "-o", "--output", default="./results", help="Output path",
@@ -332,7 +371,7 @@ if __name__ == "__main__":
         "-s",
         "--metrics",
         nargs="*",
-        default=None,
+        default=['mse' ,'mae', 'rmse', 'std', 'std_diff'],
         help="Metrics to use for evaluation. If not define it will use all possible metrics.",
     )
     args = parser.parse_args()

@@ -14,51 +14,6 @@ import tensorflow.keras.backend as K
 import scipy.io as sio
 import pandas as pd
 
-def normalize(data, norm_params, normalization_method="zscore"):
-    """
-    Normalize time series
-    :param data: time series
-    :param norm_params: tuple with params mean, std, max, min
-    :param method: zscore or minmax
-    :return: normalized time series
-    """
-    assert normalization_method in ["zscore", "minmax", "None"]
-
-    if normalization_method == "zscore":
-        std = norm_params["std"]
-        if std == 0.0:
-            std = 1e-10
-        return (data - norm_params["mean"]) / norm_params["std"]
-
-    elif normalization_method == "minmax":
-        denominator = norm_params["max"] - norm_params["min"]
-
-        if denominator == 0.0:
-            denominator = 1e-10
-        return (data - norm_params["min"]) / denominator
-
-    elif normalization_method == "None":
-        return data
-
-def denormalize(data, norm_params, normalization_method="zscore"):
-    """
-    Reverse normalization time series
-    :param data: normalized time series
-    :param norm_params: tuple with params mean, std, max, min
-    :param normalization_method: zscore or minmax
-    :return: time series in original scale
-    """
-    assert normalization_method in ["zscore", "minmax", "None"]
-
-    if normalization_method == "zscore":
-        return (data * norm_params["std"]) + norm_params["mean"]
-
-    elif normalization_method == "minmax":
-        return data * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-
-    elif normalization_method == "None":
-        return data
-
 def get_normalization_params(data):
     """
     Obtain parameters for normalization
@@ -72,7 +27,52 @@ def get_normalization_params(data):
     norm_params["max"] = d.max()
     norm_params["min"] = d.min()
     return norm_params
-
+def normalize(data, norm_params, normalization_method="zscore"):
+    """
+    Normalize time series
+    :param data: time series
+    :param norm_params: tuple with params mean, std, max, min
+    :param method: zscore or minmax
+    :return: normalized time series
+    """
+    assert normalization_method in ["zscore", "minmax", "None"]
+    if normalization_method == "zscore":
+        std = norm_params["std"]
+        if std == 0.0:
+            std = 1e-10
+        return (data - norm_params["mean"]) / norm_params["std"]
+    elif normalization_method == "minmax":
+        denominator = norm_params["max"] - norm_params["min"]
+        if denominator == 0.0:
+            denominator = 1e-10
+        return (data - norm_params["min"]) / denominator
+    elif normalization_method == "None":
+        return data
+def denormalize(data, norm_params, normalization_method="zscore"):
+    """
+    Reverse normalization time series
+    :param data: normalized time series
+    :param norm_params: tuple with params mean, std, max, min
+    :param normalization_method: zscore or minmax
+    :return: time series in original scale
+    """
+    assert normalization_method in ["zscore", "minmax", "None"]
+    if normalization_method == "zscore":
+        return (data * norm_params["std"]) + norm_params["mean"]
+    elif normalization_method == "minmax":
+        return data * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
+    elif normalization_method == "None":
+        return data
+def denormalization(X, Y, norm_params, normalization_method):
+    forecast = model(X).numpy()
+    Y_denorm = np.zeros(Y.shape)
+    for j in range(Y.shape[0]):
+        nparams = norm_params[0]
+        forecast[j] = denormalize(forecast[j], nparams, normalization_method)
+        Y_denorm[j] = denormalize(Y[j], nparams, normalization_method)
+    forecast = np.squeeze(forecast)
+    metrics_train = np.abs(forecast-np.squeeze(Y_denorm))
+    return forecast, metrics_train, Y_denorm
 def normalize_dataset(train, test, normalization_method, dtype="float32"):
     # Normalize train data
     norm_params = []
@@ -80,7 +80,6 @@ def normalize_dataset(train, test, normalization_method, dtype="float32"):
         nparams = get_normalization_params(train[i])
         train[i] = normalize(np.array(train[i], dtype=dtype), nparams, normalization_method)
         norm_params.append(nparams)
-
     # Normalize test data
     test = np.array(test, dtype=dtype)
     for i in range(test.shape[0]):
@@ -107,6 +106,19 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
     return np.array(x), np.array(y)
 
 
+def plotting_1(history,i):
+    train_loss = history.history['loss']
+    test_loss = history.history['val_loss']
+    fig, ax = plt.subplots(figsize=(8,6))
+    ax.plot(train_loss,"k",label="Training")
+    ax.plot(test_loss,"r",label="Test")
+    ax.set_xlabel("Epochs")
+    ax.set_ylabel("Loss")
+    plt.legend()
+    plt.savefig("loss_curves.png")
+    save_name = "plot1_" +str(i) + ".png"
+    plt.savefig(save_name)
+    return 
 def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     fig, (ax1,ax2) = plt.subplots(1,2,figsize=(12,6),sharey=True)
     ax1.plot(train_forecast,np.squeeze(Y_train),"+k")
@@ -128,7 +140,6 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     save_name = "plot2_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
-
 def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
@@ -137,6 +148,12 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(16,6))
     ax1.plot(np.squeeze(Y_train),"r",label= "Label")
     ax1.plot(train_forecast,"k",label= "Prediction")
+    S0 = np.std(np.squeeze(Y_train))
+    S1 = np.std(train_forecast)
+    S = np.std(np.abs(np.squeeze(Y_train)-train_forecast))
+    ax1.plot(S0, color='k', linestyle='-',label= "STD Data:{}".format(np.format_float_scientific(S0, precision=2)))
+    ax1.plot(S1, color='g', linestyle='-',label= "STD Prediction:{}".format(np.format_float_scientific(S, precision=2)))
+    ax1.plot(S, color='m', linestyle='-',label= "STD (Data - Prediction):{}".format(np.format_float_scientific(S, precision=2)))
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax1.set_ylabel("Centroid Error")
     ax1.set_title("Train")
@@ -146,6 +163,10 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     ax1.legend()
     ax2.plot(np.squeeze(Y_test),"r",label= "Label")
     ax2.plot(np.roll(test_forecast,shift),"k",label= "Prediction")
+    S0 = np.std(np.squeeze(Y_test))
+    S1 = np.std(test_forecast)
+    ax2.plot(S0, color='k', linestyle='-',label= "STD Data:{}".format(np.format_float_scientific(S0, precision=2)))
+    ax2.plot(S1, color='g', linestyle='-',label= "STD Prediction:{}".format(np.format_float_scientific(S1, precision=2)))
     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax2.set_ylabel("Centroid Error")
     ax2.set_xlabel("Time")
@@ -154,61 +175,22 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     ax2.grid(axis="y")
     ax2.set_ylim((minimo, massimo))
     ax2.legend()
-    #ax3.plot(np.squeeze(Y_train) - train_forecast, "g", label= "Train")
-    ax3.plot(np.squeeze(Y_test) - np.roll(test_forecast,shift), "b", label= "Test")
-    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-    M = np.mean(np.abs(np.squeeze(Y_test)-test_forecast))
+    ax3.plot(np.abs(np.squeeze(Y_test) - np.roll(test_forecast,shift)), "b", label= "Label - Prediction")
     S = np.std(np.abs(np.squeeze(Y_test)-test_forecast))
-
-    ax3.axhline(y=M, color='k', linestyle='-',label= "Mean:{}".format(np.format_float_scientific(M, precision=2)))
-    ax3.axhline(y=M, color='g', linestyle='-',label= "Std:{}".format(np.format_float_scientific(S, precision=2)))
-
-    rmse = np.format_float_scientific(mean_squared_error(Y_test, test_forecast, squared=False), precision=2)
-    mape = mean_absolute_percentage_error(Y_test, test_forecast)*100
-    
-    ax3.set_ylabel("(Real Dataset - Prediction)")
+    ax3.plot(S, color='m', linestyle='-',label= "STD (Data - Prediction):{}".format(np.format_float_scientific(S, precision=2)))
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax3.set_ylabel("|Label - Prediction|")
     ax3.set_xlabel("Time")
     ax3.grid(axis="x")
     ax3.grid(axis="y")
     ax3.legend()
     ax3.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
-
     plt.suptitle('{} SubSet -->{}'.format(type(model).__name__,i+1), fontsize=20)
-    plt.title('RMSE Test: {0:}\nMAPE Test: {1:.4}'.format(rmse,mape), loc='right')
     save_name = "plot3_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
 
-def loading(InOrOut):
-    OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     #X
-    OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") #X
-    ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") #X 
-    ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") #X
-    laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  #X 
-    laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy")  #X
-    Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
-    cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
-    cam = cam['saveData']
-    cam = cam[:,1]
-    return OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam
-
-
-#InLoop
-OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop")
-percentage = 80 
-fit_or_proj = "fit" 
-past_history = 30
-forecast_horizon = 1
-normalization_method = 'zscore'
-targetShift = -2
-fetureSelection = 1
-shouldIplot = 0
-
-loadboth = 0
-
-data_ln = len(cam)
-# SHIFT
-if (targetShift!=0):
+def shifting(targetShift, cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain):
     cam = np.roll(cam,targetShift)
     cam  = cam[:targetShift]
     OL_phs = OL_phs[:targetShift]
@@ -218,150 +200,85 @@ if (targetShift!=0):
     laser_Phs = laser_Phs[:targetShift]
     laser_amp = laser_amp[:targetShift]
     Egain = Egain[:targetShift]
+    return cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain
 
-if loadboth:
-    OL_phs1,OL_amp1,ILmOL_phs1,ILmOL_amp1,laser_Phs1,laser_amp1,Egain1,cam1 = loading(InOrOut = "InLoop")
-    OL_phs = np.concatenate((OL_phs, OL_phs1), axis = 0)
-    OL_amp = np.concatenate((OL_amp, OL_amp1), axis = 0)
-    ILmOL_phs = np.concatenate((ILmOL_phs, ILmOL_phs1), axis = 0)
-    ILmOL_amp = np.concatenate((ILmOL_amp, ILmOL_amp1), axis = 0)
-    laser_Phs = np.concatenate((laser_Phs, laser_Phs1), axis = 0)
-    laser_amp = np.concatenate((laser_amp, laser_amp1), axis = 0)
-    Egain = np.concatenate((Egain, Egain1), axis = 0)
-    cam = np.concatenate((cam, cam1), axis = 0)
-    data_ln = len(cam)
+def loading(InOrOut, both, targetShift):
+    OL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy")     
+    OL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") 
+    ILmOL_phs = np.load("data/"+InOrOut+"/OL_Phase.npy") - np.load("data/"+InOrOut+"/IL_Phase.npy") 
+    ILmOL_amp = np.load("data/"+InOrOut+"/OL_Magnitude.npy") - np.load("data/"+InOrOut+"/IL_Magnitude.npy") 
+    laser_Phs = np.load("data/"+InOrOut+"/Laser_Phs.npy")  
+    laser_amp = np.load("data/"+InOrOut+"/Laser_Amp.npy") 
+    Egain =  np.load("data/"+InOrOut+"/OL_Energy.npy")
+    cam = sio.loadmat("data/"+InOrOut+"/Data.mat") 
+    cam = cam['saveData']
+    cam = cam[:,1]
 
-if fetureSelection:
-    # Selected variables
-    FullDataset = np.array([cam, OL_amp, OL_phs]) 
-else:
-    # All variables
-    FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
+    cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain = shifting(targetShift, cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain)
+    if both:
+        if (InOrOut == "InLoop"):
+            InOrOut1 = "OutLoop"
+        else:
+            InOrOut1 = "InLoop"
+        OL_phs1,OL_amp1,ILmOL_phs1,ILmOL_amp1,laser_Phs1,laser_amp1,Egain1,cam1 = loading(InOrOut1)
+        cam1, OL_phs1, OL_amp1, ILmOL_phs1, ILmOL_amp1, laser_Phs1, laser_amp1, Egain1 = shifting(targetShift, cam1, OL_phs1, OL_amp1, ILmOL_phs1, ILmOL_amp1, laser_Phs1, laser_amp1, Egain1)
 
-splitting_traintest = 1
-traintest_size = data_ln//splitting_traintest
-split = int(traintest_size*percentage/100)
+        OL_phs = np.concatenate((OL_phs, OL_phs1), axis = 0)
+        OL_amp = np.concatenate((OL_amp, OL_amp1), axis = 0)
+        ILmOL_phs = np.concatenate((ILmOL_phs, ILmOL_phs1), axis = 0)
+        ILmOL_amp = np.concatenate((ILmOL_amp, ILmOL_amp1), axis = 0)
+        laser_Phs = np.concatenate((laser_Phs, laser_Phs1), axis = 0)
+        laser_amp = np.concatenate((laser_amp, laser_amp1), axis = 0)
+        Egain = np.concatenate((Egain, Egain1), axis = 0)
+        cam = np.concatenate((cam, cam1), axis = 0)
 
-metric_train = []
-metric_test = []
-metric_train_pre = []
+    return OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain, cam
 
-std_train = []
-perc_variation_train = []
-std_diff_train = []
-perc_variation_diff_train = []
-std_test = []
-perc_variation_test = []
-std_diff_test = []
-perc_variation_diff_test = []
-print("")
-print("Dataset length:",data_ln)
-for i in range(splitting_traintest):
-    start_train = traintest_size*i
-    stop_train = traintest_size*i + split
-    start_test = stop_train + 1
-    stop_test = traintest_size*(i+1)-1
+def root_mean_squared_error(y_true, y_pred):
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
+def lstm():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.LSTM(units=300, return_sequences=False)(inputs)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(64, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(16, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(forecast_horizon)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+def mlp():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.Flatten()(inputs)
+    x = tf.keras.layers.Dense(512, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(64, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(32, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(16, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(8, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(forecast_horizon)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
 
-    print("Train start--stop:",start_train,"--",stop_train)
-    print("Test start--stop:",start_test,"--",stop_test)
-    print("")
-    train, test = FullDataset[:,start_train:stop_train], FullDataset[:,start_test:stop_test]
-
-    train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
-    X_train, Y_train = windows_preprocessing(train, past_history, forecast_horizon)
-    X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
-
-    print(np.shape(X_test))
-    print(np.shape(X_train))    
-    
-    def lstm():
-        inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-        x = tf.keras.layers.LSTM(units=300, return_sequences=False)(inputs)
-        # x = tf.keras.layers.Conv1D(64, 3, activation="relu", padding="same")(inputs)
-        x = tf.keras.layers.Flatten()(x)
-        # x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.Dense(256, activation='relu')(x)
-        # x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.Dense(128, activation='relu')(x)
-        # x = tf.keras.layers.Dropout(0.1)(x)
-        x = tf.keras.layers.Dense(64, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.Dense(32, activation='relu')(x)
-        # x = tf.keras.layers.Dropout(0.1)(x)
-        x = tf.keras.layers.Dense(16, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        x = tf.keras.layers.Dense(forecast_horizon)(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        
-        return model
-    
-    
-    def mlp():
-        # MLP
-        inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-
-        x = tf.keras.layers.Flatten()(inputs)
-        x = tf.keras.layers.Dense(512, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dense(64, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dense(32, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dense(16, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.BatchNormalization()(x)
-        x = tf.keras.layers.Dense(8, activation='relu')(x)
-        x = tf.keras.layers.Dropout(0.1)(x)
-        # x = tf.keras.layers.BatchNormalization()(x)f
-        x = tf.keras.layers.Dense(forecast_horizon)(x)
-        model = tf.keras.Model(inputs=inputs, outputs=x)
-        return model
-    
-    def root_mean_squared_error(y_true, y_pred):
-        return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
-    
-    model = lstm()
-    # model = mlp()
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
-    # lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-    #     initial_learning_rate=1e-2,
-    #     decay_steps=100,
-    #     decay_rate=0.9)
-    # optimizer = keras.optimizers.Adam(learning_rate=lr_schedule) 
-    # model.compile(optimizer=optimizer, loss='mse')  
-
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
-    train_forecast_pre = model(X_train).numpy()
-    #history = model.fit(X_train,Y_train,batch_size=8, epochs=20, validation_data=(X_test,Y_test), shuffle=True, callbacks=[callback])
-    history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
-    
-    train_forecast = model(X_train).numpy()
-    Y_train_denorm = np.zeros(Y_train.shape)
-    for j in range(Y_train.shape[0]):
-        nparams = norm_params[0]
-        train_forecast[j] = denormalize(train_forecast[j], nparams, normalization_method)
-        Y_train_denorm[j] = denormalize(Y_train[j], nparams, normalization_method)
-    train_forecast = np.squeeze(train_forecast)
-    metrics_train = np.abs(train_forecast-np.squeeze(Y_train_denorm))
-
-    #test_forecast = model.predict(X_test)
+def testing(X_test, past_history, FullDataset):
     test_forecast = []
-    X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))
+    X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))        
     for k in range(len(X_test)):        
         if (len(test_forecast)<past_history):
             if (len(test_forecast)==0):
                 n_value_neede = past_history
                 x_cam_first =  X_test2[k, :n_value_neede, 0]
-                x_cam = x_cam_first #Check concatenation axis
+                x_cam = x_cam_first 
             else:
                 x_cam_last = np.squeeze(np.array(test_forecast[-len(test_forecast):]),1)
                 n_value_neede = past_history - len(test_forecast)
                 x_cam_first =  X_test2[k, :n_value_neede, 0]
                 x_cam_last = np.array(x_cam_last).reshape(-1,)
-                x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) #Check concatenation axis
+                x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) 
             x_external = X_test2[k,:,1:]
             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
             new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
@@ -374,79 +291,96 @@ for i in range(splitting_traintest):
             new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
             local_forecast = model(new_X_test)
             test_forecast.append(local_forecast)
+    return test_forecast
 
-    Y_test_denorm = np.zeros(Y_test.shape)
-    for j in range(Y_test.shape[0]):
-        nparams = norm_params[0]
-        test_forecast[j] = denormalize(test_forecast[j], nparams, normalization_method)
-        Y_test_denorm[j] = denormalize(Y_test[j], nparams, normalization_method)
-    test_forecast = np.squeeze(test_forecast)
-    metrics_test = np.abs(test_forecast-np.squeeze(Y_test_denorm))
+if __name__ == "__main__":
+    percentage = 80 
+    fit_or_proj = "fit" 
+    past_history = 30
+    forecast_horizon = 1
+    normalization_method = 'zscore'
+    fetureSelection = 1
 
-    #NEW STD STUFF
-    #train
-    std_train.append(np.std(Y_train_denorm))
-    perc_variation_train.append(np.std(Y_train_denorm)/np.mean(Y_train_denorm))
-    diff_train = np.abs(np.squeeze(Y_train_denorm) - train_forecast)
-    std_diff_train.append(np.std(diff_train))
-    perc_variation_diff_train.append(np.std(diff_train)/np.mean(diff_train))
-    #test
-    std_test.append(np.std(Y_test_denorm))
-    perc_variation_test.append(np.std(Y_test_denorm)/np.mean(Y_test_denorm))
-    diff_test = np.abs(np.squeeze(Y_test_denorm) - test_forecast)
-    std_diff_test.append(np.std(diff_test))
-    perc_variation_diff_test.append(np.std(diff_test)/np.mean(diff_test))
+    #InLoop
+    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
+    if fetureSelection:
+        FullDataset = np.array([cam, OL_amp, OL_phs]) 
+    else:
+        FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-    metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
-    metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
+    splitting_traintest = 1
+    traintest_size = len(cam)//splitting_traintest
+    split = int(traintest_size*percentage/100)
 
-    train_loss = history.history['loss']
-    test_loss = history.history['val_loss']
-    fig, ax = plt.subplots(figsize=(8,6))
-    ax.plot(train_loss,"k",label="Training")
-    ax.plot(test_loss,"r",label="Test")
-    ax.set_xlabel("Epochs")
-    ax.set_ylabel("Loss")
-    plt.legend()
-    plt.savefig("loss_curves.png")
-    plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-    plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, model)
-    if shouldIplot:
-        plt.show()
+    metric_train = []
+    metric_test = []
+    std_train = []
+    std_diff_train = []
+    std_test = []
+    std_diff_test = []
+    for i in range(splitting_traintest):
+        # Splitting dataset
+        start_train = traintest_size*i
+        stop_train = traintest_size*i + split
+        start_test = stop_train + 1
+        stop_test = traintest_size*(i+1)-1
+        print("Train start--stop:",start_train,"--",stop_train)
+        print("Test start--stop:",start_test,"--",stop_test)
+        print("")
+        train, test = FullDataset[:,start_train:stop_train], FullDataset[:,start_test:stop_test]
+        # Normalization
+        train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
+        # Windowing
+        X_train, Y_train = windows_preprocessing(train, past_history, forecast_horizon)
+        X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
+  
+        # Model
+        model = lstm()
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
+        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
+        train_forecast_pre = model(X_train).numpy()
+        history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
+        # Test
+        test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset)
+        # Denormalize
+        train_forecast, metrics_train, Y_train_denorm= denormalization(X=X_train, Y = Y_train, norm_params= norm_params, normalization_method= normalization_method)
+        test_forecast, metrics_test, Y_test_denorm= denormalization(X=X_test, Y = Y_test, norm_params= norm_params, normalization_method= normalization_method)
 
-m_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
-print("Training RMSE",m_train)
-m_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
-print("Test RMSE",m_test)
+        # Metrics
+        Y_train_denorm = np.squeeze(Y_train_denorm)
+        Y_test_denorm = np.squeeze(Y_test_denorm)
+        std_train.append(np.std(Y_train_denorm))
+        std_test.append(np.std(Y_test_denorm))
+        diff_train = np.abs(np.squeeze(Y_train_denorm) - train_forecast)
+        diff_test = np.abs(np.squeeze(Y_test_denorm) - test_forecast)
+        std_diff_train.append(np.std(diff_train))
+        std_diff_test.append(np.std(diff_test))
+        metric_train.append([mean_squared_error(Y_train_denorm, train_forecast, squared=False), mean_absolute_percentage_error(Y_train_denorm, train_forecast)])
+        metric_test.append([mean_squared_error(Y_test_denorm, test_forecast, squared=False), mean_absolute_percentage_error(Y_test_denorm, test_forecast)])
+        # Plotting
+        plotting_1(history,i)
+        plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+        plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, model)
 
-m_train = [m[1]*100 for m in metric_train]
-print("Training MAPE",m_train)
-m_test = [m[1]*100 for m in metric_test]
-print("Test MAPE",m_test)
-
-
-sci_std_train = [np.format_float_scientific(m, precision=2) for m in std_train]
-sci_perc_variation_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_train]
-sci_std_diff_train = [np.format_float_scientific(m, precision=2) for m in std_diff_train]
-sci_perc_variation_diff_train = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_train]
-
-sci_std_test = [np.format_float_scientific(m, precision=2) for m in std_test]
-sci_perc_variation_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_test]
-sci_std_diff_test = [np.format_float_scientific(m, precision=2) for m in std_diff_test]
-sci_perc_variation_diff_test = [np.format_float_scientific(m, precision=2) for m in perc_variation_diff_test]
-
-print("-----------------------------------------------------------------------------")
-print("Train:")
-print("STD RealDataser ----------------------------------->",sci_std_train)
-print("Percentade Variation RealDataser ------------------>",sci_perc_variation_train)
-print("STD (RealDataser - Prediction) -------------------->", sci_std_diff_train)
-print("Percentade Variation (RealDataser - Prediction): -->",sci_perc_variation_diff_train)
-print("-----------------------------------------------------------------------------")
-print("")
-print("")
-print("Test:")
-print("STD RealDataser ----------------------------------->",sci_std_test)
-print("Percentade Variation RealDataser  ----------------->",sci_perc_variation_test)
-print("STD (RealDataser - Prediction)  ------------------->", sci_std_diff_test)
-print("Percentade Variation (RealDataser - Prediction)  -->",sci_perc_variation_diff_test)
-print("-----------------------------------------------------------------------------")
+    
+    #Printing
+    sci_metric_train = [np.format_float_scientific(m[0], precision=2) for m in metric_train]
+    sci_std_train = [np.format_float_scientific(m, precision=2) for m in std_train]
+    sci_std_diff_train = [np.format_float_scientific(m, precision=2) for m in std_diff_train]
+    sci_metric_test = [np.format_float_scientific(m[0], precision=2) for m in metric_test]
+    sci_std_test = [np.format_float_scientific(m, precision=2) for m in std_test]
+    sci_std_diff_test = [np.format_float_scientific(m, precision=2) for m in std_diff_test]
+    
+    print("")
+    print("-------------------------------------- TRAIN --------------------------------------")
+    print("STD RealDataser ----------------------------------->",sci_std_train)
+    print("STD (RealDataser - Prediction) -------------------->",sci_std_diff_train)
+    print("RMSE Prediction ----------------------------------->",sci_metric_train)
+    print("-----------------------------------------------------------------------------------")
+    print("")
+    print("")
+    print("--------------------------------------- TEST ---------------------------------------")
+    print("STD RealDataser ----------------------------------->",sci_std_test)
+    print("STD (RealDataser - Prediction)  ------------------->",sci_std_diff_test)
+    print("RMSE Prediction ----------------------------------->",sci_metric_test)
+    print("-----------------------------------------------------------------------------------")

@@ -13,6 +13,7 @@ from tensorflow.keras import layers
 import tensorflow.keras.backend as K
 import scipy.io as sio
 import pandas as pd
+import time
 
 def get_normalization_params(data):
     """
@@ -153,7 +154,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     S = np.std(np.abs(np.squeeze(Y_train)-train_forecast))
     ax1.plot(S0, color='k', linestyle='-',label= "STD Data:{}".format(np.format_float_scientific(S0, precision=2)))
     ax1.plot(S1, color='g', linestyle='-',label= "STD Prediction:{}".format(np.format_float_scientific(S, precision=2)))
-    ax1.plot(S, color='m', linestyle='-',label= "STD (Data - Prediction):{}".format(np.format_float_scientific(S, precision=2)))
+    ax1.plot(S, color='m', linestyle='-',label= "STD (|Data - Prediction|):{}".format(np.format_float_scientific(S, precision=2)))
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax1.set_ylabel("Centroid Error")
     ax1.set_title("Train")
@@ -177,7 +178,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     ax2.legend()
     ax3.plot(np.abs(np.squeeze(Y_test) - np.roll(test_forecast,shift)), "b", label= "Label - Prediction")
     S = np.std(np.abs(np.squeeze(Y_test)-test_forecast))
-    ax3.plot(S, color='m', linestyle='-',label= "STD (Data - Prediction):{}".format(np.format_float_scientific(S, precision=2)))
+    ax3.plot(S, color='m', linestyle='-',label= "STD (|Data - Prediction|):{}".format(np.format_float_scientific(S, precision=2)))
     ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
     ax3.set_ylabel("|Label - Prediction|")
     ax3.set_xlabel("Time")
@@ -294,6 +295,7 @@ def testing(X_test, past_history, FullDataset):
     return test_forecast
 
 if __name__ == "__main__":
+    t = time.time()
     percentage = 80 
     fit_or_proj = "fit" 
     past_history = 30
@@ -374,13 +376,16 @@ if __name__ == "__main__":
     print("")
     print("-------------------------------------- TRAIN --------------------------------------")
     print("STD RealDataser ----------------------------------->",sci_std_train)
-    print("STD (RealDataser - Prediction) -------------------->",sci_std_diff_train)
+    print("STD (|RealDataser - Prediction|) -------------------->",sci_std_diff_train)
     print("RMSE Prediction ----------------------------------->",sci_metric_train)
     print("-----------------------------------------------------------------------------------")
     print("")
     print("")
     print("--------------------------------------- TEST ---------------------------------------")
     print("STD RealDataser ----------------------------------->",sci_std_test)
-    print("STD (RealDataser - Prediction)  ------------------->",sci_std_diff_test)
+    print("STD (|RealDataser - Prediction|)  ------------------->",sci_std_diff_test)
     print("RMSE Prediction ----------------------------------->",sci_metric_test)
     print("-----------------------------------------------------------------------------------")
+    elapsed = time.time() - t
+    print("-----------------------------------------------------------------------------------")
+    print("TIME:",elapsed)

@@ -26,7 +26,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Main",
+            "name": "Main GS",
             "type": "python",
             "request": "launch",
             "program": "main.py",
@@ -34,11 +34,12 @@
             "cwd": "/home/manuel/HiRES/AdvancedML/manuel",
             "args": ["--models","lstm",
             "--parameters=./parameters.json",
-            "--metrics", "rmse"]
+            "--metrics", "rmse", "std", "std_diff"],
+            "justMyCode": false
         },
 
         {
-            "name": "MainML",
+            "name": "MainGS ML",
             "type": "python",
             "request": "launch",
             "program": "main_ml.py",

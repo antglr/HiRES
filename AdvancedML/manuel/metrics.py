@@ -131,6 +131,13 @@ def mrae(actual: np.ndarray, predicted: np.ndarray, benchmark: np.ndarray = None
     """ Mean Relative Absolute Error """
     return np.mean(np.abs(_relative_error(actual, predicted, benchmark)))
 
+def std_diff(actual: np.ndarray, predicted: np.ndarray):
+    return np.std(np.abs(_error(actual, predicted)))
+
+def std(actual: np.ndarray, predicted: np.ndarray):
+    return np.std(actual)
+
+
 
 METRICS = {
     "mse": mse,
@@ -140,6 +147,8 @@ METRICS = {
     # "mape": mape,
     # "smape": smape,
     "mase": mase,
+    "std_diff": std_diff,
+    "std": std
     # "std_ae": std_ae,
     # "std_ape": std_ape,
     # "rae": rae,

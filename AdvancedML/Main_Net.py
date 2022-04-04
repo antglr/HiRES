@@ -142,7 +142,7 @@ def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
     save_name = "plot2_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
-def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
+def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, r):
     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
 
@@ -153,52 +153,107 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, model):
     RMS_test = np.sqrt(np.mean(Y_test**2))
     RMSE_test = np.sqrt(np.mean((diff_test)**2))
 
-    shift = 0
-
-    fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(16,6))
-    ax1.plot(np.squeeze(Y_train[:250]),"r",label= "Label")
-    ax1.plot(train_forecast[:250],"k",label= "Prediction")
-    #S0 = np.std(np.squeeze(Y_train))
-    #S1 = np.std(train_forecast)
-    #S = np.std(np.abs(np.squeeze(Y_train)-train_forecast))
-    #ax1.plot(S0, color='k', linestyle='-',label= "STD Data:{}".format(np.format_float_scientific(S0, precision=2)))
+    fig, (ax1,ax2,ax3,ax4) = plt.subplots(4,figsize=(16,6))
+    ax1.plot(np.squeeze(Y_train[:r]),"r",label= "Label")
+    ax1.plot(train_forecast[:r],"k",label= "Prediction")
     ax1.plot(RMS_train, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_train, precision=2)))
     ax1.plot(RMSE_train, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_train, precision=2)))
     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-    ax1.set_ylabel("Centroid Error")
+    ax1.set_ylabel("Centroid")
     ax1.set_title("Train")
     ax1.grid(axis="x")
     ax1.grid(axis="y")
     ax1.set_ylim((minimo, massimo))
     ax1.legend()
-    ax2.plot(np.squeeze(Y_test),"r",label= "Label")
-    ax2.plot(np.roll(test_forecast,shift),"k",label= "Prediction")
-    #S0 = np.std(np.squeeze(Y_test))
-    #S1 = np.std(test_forecast)
-    #ax2.plot(S0, color='k', linestyle='-',label= "STD Data:{}".format(np.format_float_scientific(S0, precision=2)))
-    #ax2.plot(S1, color='g', linestyle='-',label= "STD Prediction:{}".format(np.format_float_scientific(S1, precision=2)))
-    ax2.plot(RMS_test, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_test, precision=2)))
-    ax2.plot(RMSE_test, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_test, precision=2)))
-    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-    ax2.set_ylabel("Centroid Error")
+    ax2.plot(np.squeeze(Y_train[:r]) - train_forecast[:r], "b", label= "Label - Prediction")
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax2.set_ylabel("Label - Prediction")
     ax2.set_xlabel("Time")
-    ax2.set_title("Test")
     ax2.grid(axis="x")
     ax2.grid(axis="y")
-    ax2.set_ylim((minimo, massimo))
-    ax2.legend()
-    ax3.plot(np.squeeze(Y_test) - np.roll(test_forecast,shift), "b", label= "Label - Prediction")
-    #S = np.std(np.abs(np.squeeze(Y_test)-test_forecast))
-    #ax3.plot(S, color='m', linestyle='-',label= "STD (|Data - Prediction|):{}".format(np.format_float_scientific(S, precision=2)))
-    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-    ax3.set_ylabel("|Label - Prediction|")
+    ax2.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
+    ax3.plot(np.squeeze(Y_test),"r",label= "Label")
+    ax3.plot(test_forecast,"k",label= "Prediction")
+    ax3.plot(RMS_test, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_test, precision=2)))
+    ax3.plot(RMSE_test, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_test, precision=2)))
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax3.set_ylabel("Centroid")
     ax3.set_xlabel("Time")
+    ax3.set_title("Test")
     ax3.grid(axis="x")
     ax3.grid(axis="y")
+    ax3.set_ylim((minimo, massimo))
     ax3.legend()
-    ax3.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
-    plt.suptitle('{} SubSet -->{}'.format(type(model).__name__,i+1), fontsize=20)
+    ax4.plot(np.squeeze(Y_test) - test_forecast, "b", label= "Label - Prediction")
+    ax4.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax4.set_ylabel("|Label - Prediction|")
+    ax4.set_xlabel("Time")
+    ax4.grid(axis="x")
+    ax4.grid(axis="y")
+    ax4.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2)) 
     save_name = "plot3_" +str(i) + ".png"
+    plt.savefig(save_name)
+    return 
+def plotting_4(train_forecast,Y_train,test_forecast,Y_test,i):
+    # massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
+    # minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
+    
+    Y_train = np.squeeze(Y_train)
+    Y_test = np.squeeze(Y_test)
+
+    start = 0
+    stop = 60
+    Rolling_Y_train = []
+    Rolling_train_forecast =[]
+    for j in range(0,len(Y_train)-60):
+        Rolling_Y_train.append(np.std(Y_train[start:stop]))
+        Rolling_train_forecast.append(np.std(Y_train[start:stop] - train_forecast[start:stop]))
+        start += 1
+        stop += 1
+    Rmean_Y_train = np.mean(Rolling_Y_train)
+    Rmean_train_forecast = np.mean(Rolling_train_forecast)
+
+
+    start = 0
+    stop = 60
+    Rolling_Y_test = []
+    Rolling_test_forecast = []
+    for j in range(0,len(Y_test)-60):
+        Rolling_Y_test.append(np.std(Y_test[start:stop]))
+        Rolling_test_forecast.append(np.std(Y_test[start:stop] - test_forecast[start:stop]))
+        start += 1
+        stop += 1
+    Rmean_Y_test = np.mean(Rolling_Y_test)
+    Rmean_test_forecast = np.mean(Rolling_test_forecast)
+    
+    fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
+    ax1.plot(Rolling_Y_train,"r",label= "Rolling STD -- Mean:{}".format(np.format_float_scientific(Rmean_Y_train, precision=2)))
+    ax1.plot(Rolling_train_forecast,"k",label= "Rolling STD (Label - Prediction) -- Mean:{}".format(np.format_float_scientific(Rmean_train_forecast, precision=2)))
+    ax1.hlines(y=np.std(Y_train), xmin=0, xmax=len(Rolling_Y_train), color='orange', label= "STD :{}".format(np.format_float_scientific(np.std(Y_train), precision=2)))
+    ax1.hlines(y=np.std(Y_train - train_forecast), xmin=0, xmax=len(Rolling_train_forecast), color='gray', label= "STD  (Label - Prediction):{}".format(np.format_float_scientific(np.std(Y_train - train_forecast), precision=2)))
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+
+    ax1.set_ylabel("STD")
+    ax1.set_title("TRAIN")
+    ax1.grid(axis="x")
+    ax1.grid(axis="y")
+    ax1.legend()
+
+
+    ax2.plot(Rolling_Y_test,"r",label= "Rolling STD  -- Mean:{}".format(np.format_float_scientific(Rmean_Y_test, precision=2)))
+    ax2.plot(Rolling_test_forecast,"k",label= "Rolling STD  (Label - Prediction) -- Mean:{}".format(np.format_float_scientific(Rmean_test_forecast, precision=2)))
+    ax2.hlines(y=np.std(Y_test), xmin=0, xmax=len(Rolling_Y_test), color='orange', label= "STD :{}".format(np.format_float_scientific(np.std(Y_test), precision=2)))
+    ax2.hlines(y=np.std(Y_test - test_forecast), xmin=0, xmax=len(Rolling_test_forecast), color='grey', label= "STD  (Label - Prediction):{}".format(np.format_float_scientific(np.std(Y_test - test_forecast), precision=2)))
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+
+    ax2.set_ylabel("STD")
+    ax2.set_title("TEST")
+    ax2.grid(axis="x")
+    ax2.grid(axis="y")
+    ax2.set_xlabel("Acq point)")
+    ax2.legend()
+    
+    save_name = "plot4_" +str(i) + ".png"
     plt.savefig(save_name)
     return 
 
@@ -262,15 +317,27 @@ def lstm():
 def mlp():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
     x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(512, activation='relu')(x)
+    x = tf.keras.layers.Dense(1024, activation='tanh')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(64, activation='relu')(x)
+    x = tf.keras.layers.Dense(512, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(32, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(16, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(8, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(forecast_horizon)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+def cnn():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.Conv1D(32, 3, activation="relu", padding="same")(inputs)
+    x = tf.keras.layers.MaxPool1D(pool_size=2)(x)    
+    x = tf.keras.layers.Flatten()(inputs)
+    x = tf.keras.layers.Dense(64, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)        
+    x = tf.keras.layers.Dense(16, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(forecast_horizon)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -305,26 +372,25 @@ def testing(X_test, past_history, FullDataset):
             test_forecast.append(local_forecast)
     return test_forecast
 
-def root_mean_squared_error(y_true, y_pred):
-        return K.sqrt(K.mean(K.square(y_pred - y_true))) 
 
 if __name__ == "__main__":
     t = time.time()
-    percentage = 80 
+    percentage = 90 
     fit_or_proj = "fit" 
     past_history = 30
     forecast_horizon = 1
     normalization_method = 'zscore'
+    splitting_traintest = 1
     fetureSelection = 1
 
     #InLoop
-    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
+    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop", both = False, targetShift = -2)
     if fetureSelection:
         FullDataset = np.array([cam, OL_amp, OL_phs]) 
     else:
         FullDataset = np.array([cam, OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp])
 
-    splitting_traintest = 1
+    
     traintest_size = len(cam)//splitting_traintest
     split = int(traintest_size*percentage/100)
 
@@ -349,17 +415,16 @@ if __name__ == "__main__":
         X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
   
         # Model
-        model = lstm()
+        model = cnn()
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss = root_mean_squared_error)  
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
+        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
         history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=0.1, shuffle=False)
         train_forecast = model(X_train).numpy()
         # Test
         test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset)
-        #test_forecast = model(X_test).numpy()
         # Denormalize
-        train_forecast, metrics_train, Y_train_denorm= denormalization(forecast= train_forecast, X=X_train, Y = Y_train, norm_params= norm_params, normalization_method= normalization_method)
-        test_forecast, metrics_test, Y_test_denorm= denormalization(forecast= test_forecast, X=X_test, Y = Y_test, norm_params= norm_params, normalization_method= normalization_method)
+        train_forecast, metrics_train, Y_train_denorm= denormalization(forecast=train_forecast, X=X_train, Y = Y_train, norm_params= norm_params, normalization_method= normalization_method)
+        test_forecast, metrics_test, Y_test_denorm= denormalization(forecast=test_forecast, X=X_test, Y = Y_test, norm_params= norm_params, normalization_method= normalization_method)
         # Metrics
         Y_train_denorm = np.squeeze(Y_train_denorm)
         Y_test_denorm = np.squeeze(Y_test_denorm)
@@ -374,7 +439,9 @@ if __name__ == "__main__":
         # Plotting
         plotting_1(history,i)
         plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-        plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, model)
+        plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = 200)
+        plotting_4(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+
 
     #Printing
     sci_rms_train = [np.format_float_scientific(m, precision=2) for m in rms_train]

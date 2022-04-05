@@ -384,7 +384,7 @@ if __name__ == "__main__":
     fetureSelection = 1
 
     #InLoop
-    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop", both = False, targetShift = -2)
+    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
     if fetureSelection:
         FullDataset = np.array([cam, OL_amp, OL_phs]) 
     else:
@@ -415,7 +415,7 @@ if __name__ == "__main__":
         X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
   
         # Model
-        model = cnn()
+        model = lstm()
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss = root_mean_squared_error)  
         callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
         history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=0.1, shuffle=False)

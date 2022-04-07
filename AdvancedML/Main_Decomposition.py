@@ -1,3 +1,4 @@
+from cProfile import label
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
@@ -139,15 +140,15 @@ def root_mean_squared_error(y_true, y_pred):
 def mlp():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-1:])
     x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(1024, activation='tanh')(x)
+    x = tf.keras.layers.Dense(4096, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(2048, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(1024, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(512, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(32, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(16, activation='relu')(x)
-    x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.Dense(8, activation='relu')(x)
+    x = tf.keras.layers.Dense(254, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(forecast_horizon)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     past_history = 30
     forecast_horizon = 1
     normalization_method = 'zscore'
-    fetureSelection = 1
+    fetureSelection = 0
 
     #InLoop
     OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
@@ -172,32 +173,22 @@ if __name__ == "__main__":
     cma_trend    = (decomposition.trend).to_numpy()
     y = cma_trend[30:-30]
 
-    
     if fetureSelection:
         x = np.array([OL_amp[30:-30], OL_phs[30:-30]]) 
     else:
         x = np.array([OL_phs[30:-30], OL_amp[30:-30], ILmOL_phs[30:-30], ILmOL_amp[30:-30], laser_Phs[30:-30], laser_amp[30:-30]])
-    
-    
     x, y, norm_params = normalize_dataset(x, y, normalization_method)
     
-    
-    # n_x= np.count_nonzero(np.isnan(y))
-    # print(n_x)
-    # print(np.shape(y))
     stop_train = int(len(cma_trend)*percentage/100)
     Y_train, Y_test = y[:stop_train], y[stop_train:]
     X_train, X_test = x[:,:stop_train], x[:,stop_train:]
       
     X_train = X_train.reshape(X_train.shape[1],  X_train.shape[0] )
-    #X_test = X_test.reshape(X_test.shape[0] * X_test.shape[1] )
     Y_train = Y_train.reshape(Y_train.shape[0],1)
 
+    X_test = X_test.reshape(X_test.shape[1],  X_test.shape[0] )
+    Y_test = Y_test.reshape(Y_test.shape[0],1)
 
-    print(np.shape(X_train))
-    print(np.shape(Y_train))
-    
-                    
     #model = LinearRegression()
     #model.fit(X_train,Y_train)
     #train_forecast = model.predict(X_train)    
@@ -207,12 +198,15 @@ if __name__ == "__main__":
     history = model.fit(X_train,Y_train,batch_size=64, epochs=500, validation_split=0.1, shuffle=True)
     train_forecast = model(X_train).numpy()
 
-
-
-
     plt.figure()
-    plt.plot(Y_train,'b')
-    plt.plot(train_forecast,'r')
+    plt.plot(Y_train,'b',label="Label")
+    plt.plot(train_forecast,'r', label="Prediction")
+    plt.legend()
     plt.savefig("0_Train.png")
 
-
+    test_forecast = model(X_test).numpy()
+    plt.figure()
+    plt.plot(Y_test,'b',label="Label")
+    plt.plot(test_forecast,'r', label="Prediction")
+    plt.legend()
+    plt.savefig("0_Test.png")

@@ -194,8 +194,8 @@ if __name__ == "__main__":
     #train_forecast = model.predict(X_train)    
     model = mlp()
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001), loss = root_mean_squared_error)  
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
-    history = model.fit(X_train,Y_train,batch_size=64, epochs=500, validation_split=0.1, shuffle=True)
+    #callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
+    history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=0.1, shuffle=True)
     train_forecast = model(X_train).numpy()
 
     plt.figure()

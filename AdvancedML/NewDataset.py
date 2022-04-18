@@ -148,8 +148,8 @@ def plotting_4(y_train, train_forecast, y_test, test_forecast):
 if __name__ == "__main__":
     clrscr()
     
-    #filname = "new_dataset/Third_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
-    filname = "new_dataset/Third_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    filname = "new_dataset/Third_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+    #filname = "new_dataset/Third_Dataset/OpenLoop1postp.mat" #-->OpenLoop
     dict = loadmat(filname)
     dataset, cam = to_dataframe(dict)
     

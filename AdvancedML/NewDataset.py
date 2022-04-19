@@ -9,6 +9,8 @@ import scipy.io as sio
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.linear_model import LinearRegression
 
 
 def clrscr():
@@ -52,7 +54,7 @@ def to_dataframe(dictionary):
     dataset = pd.DataFrame({'x_Laser': dict["LCam1_Gauss"][:,0], 'xRMS_Laser': dict["LCam1_Gauss"][:,1], 'y_Laser': dict["LCam1_Gauss"][:,2], 'yRMS_Laser': dict["LCam1_Gauss"][:,3], 
                             'u_Laser': dict["LCam1_Gauss"][:,4], 'uRMS_Laser': dict["LCam1_Gauss"][:,5], 'v_Laser': dict["LCam1_Gauss"][:,6], 'vRMS_Laser': dict["LCam1_Gauss"][:,7], 
                             'sum_Laser': dict["LCam1_Gauss"][:,8], 'rf_amp': dict["Cav_Amp"],  'rf_phs': dict["Cav_Phs"],  'fw2_amp': dict["Fwd2_Amp"],  'fw2_phs': dict["Fwd2_Phs"], 
-                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"],  'laser_phs': dict["LP_Phase"], })
+                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"], 'laser_phs': dict["LP_Amp"], 'laser_phs': dict["LP_Phase"]})
     cam = dict["AdjUCam1Pos"]
     return dataset, cam
 
@@ -145,35 +147,51 @@ def plotting_4(y_train, train_forecast, y_test, test_forecast):
     return  
 
 #################################################################################
+#################################################################################
+#################################################################################
+
 if __name__ == "__main__":
     clrscr()
     
-    filname = "new_dataset/Third_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
-    #filname = "new_dataset/Third_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+    filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
     dict = loadmat(filname)
-    dataset, cam = to_dataframe(dict)
+    # print(dict["syncData"])
+    dataset, cam = to_dataframe(dict) # X and Y
+    
+    
     
     dataset,C_mean,C_std = normalization(dataset)
+    stop = int(0.8*len(dataset))
+    #X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2)
+    X_train = dataset.iloc[:stop]
+    X_test = dataset.iloc[stop:]
+    y_train = cam[:stop]
+    y_test = cam[stop:]
     
-    X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2)
+    #reg = LinearRegression().fit(X_train, y_train)
     reg = MLPRegressor(hidden_layer_sizes=(64,64,64),activation="relu" ,random_state=42, max_iter=2000).fit(X_train, y_train)
     train_forecast=reg.predict(X_train)
     test_forecast=reg.predict(X_test)
 
-    plotting_1(y_train,train_forecast,y_test, test_forecast, 200)
+    plotting_1(y_train,train_forecast,y_test, test_forecast, 500)
     plotting_4(y_train, train_forecast, y_test, test_forecast)
     std_data_train = np.std(y_train)
     std_train = np.std(y_train-train_forecast)    
     std_data_test = np.std(y_test)
     std_test = np.std(y_test-test_forecast)   
-     
+    
+    rms_train = np.sqrt(np.mean(y_train**2))
     rmse_train = mean_squared_error(y_train, train_forecast, squared=False)
+    rms_test = np.sqrt(np.mean(y_test**2))
     rmse_test = mean_squared_error(y_test, test_forecast, squared=False)
         
     
     print("")
     print("-------------------------------------- TRAIN --------------------------------------")
     print("STD (Lable)  ---------------------------------------------------->",round(std_data_train, 3))
+    print("RMS  ----------------------------------------------------------->",round(rms_train, 3))
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("STD (Lable - Prediction)  --------------------------------------->",round(std_train, 3))
     print("RMSE  ----------------------------------------------------------->",round(rmse_train, 3))
     print("-----------------------------------------------------------------------------------")
@@ -181,35 +199,11 @@ if __name__ == "__main__":
     print("")
     print("--------------------------------------- TEST ---------------------------------------")
     print("STD (Lable)  ---------------------------------------------------->",round(std_data_test, 3))
+    print("RMS  ----------------------------------------------------------->",round(rms_test, 3))
+    print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("STD (Lable - Prediction)  --------------------------------------->",round(std_test, 3))
     print("RMSE ------------------------------------------------------------>",round(rmse_test, 3))
     print("-----------------------------------------------------------------------------------") 
-       
-    # traintest_size = len(cam)//splitting_traintest
-    # split = int(traintest_size*percentage/100)
-
-    # rms_train = []
-    # rms_test = []
-    # rmse_train = []
-    # rmse_test = []
-    # for i in range(splitting_traintest):
-    #     # Splitting dataset
-    #     start_train = traintest_size*i
-    #     stop_train = traintest_size*i + split
-    #     start_test = stop_train + 1
-    #     stop_test = traintest_size*(i+1)-1
-    #     print("Train start--stop:",start_train,"--",stop_train)
-    #     print("Test start--stop:",start_test,"--",stop_test)
-    #     print("")
-    #     train, test = FullDataset[:,start_train:stop_train], FullDataset[:,start_test:stop_test]
-    #     # Normalization
-    #     train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
-    #     # Windowing
-    #     X_train, Y_train = windows_preprocessing(train, past_history, forecast_horizon)
-    #     X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
-    
-    
-
     
     
     

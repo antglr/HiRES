@@ -264,6 +264,22 @@ def mlp():
     model = tf.keras.Model(inputs=inputs, outputs=x)
     return model
 
+def cnn():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.Conv1D(
+        32, 3, activation="relu", padding="same"
+    )(inputs)
+    x = tf.keras.layers.MaxPool1D(pool_size=2)(x)    
+    x = tf.keras.layers.Flatten()(inputs)
+    # x = tf.keras.layers.Dense(64, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)        
+    # x = tf.keras.layers.Dense(16, activation='relu')(x)
+    # x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(forecast_horizon)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+
+
 def testing(X_test, past_history, FullDataset):
     test_forecast = []
     X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))        
@@ -296,13 +312,13 @@ def testing(X_test, past_history, FullDataset):
 if __name__ == "__main__":
     percentage = 80 
     fit_or_proj = "fit" 
-    past_history = 30
+    past_history = 60
     forecast_horizon = 1
     normalization_method = 'zscore'
     fetureSelection = 1
 
     #InLoop
-    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
+    OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "InLoop", both = False, targetShift = -2)
     if fetureSelection:
         FullDataset = np.array([cam, OL_amp, OL_phs]) 
     else:
@@ -336,10 +352,13 @@ if __name__ == "__main__":
   
         # Model
         model = lstm()
+        # model = mlp()
+        model = cnn()
+
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')       
         callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5) 
         train_forecast_pre = model(X_train).numpy()
-        history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
+        history = model.fit(X_train,Y_train,batch_size=128, epochs=100, validation_data=(X_test,Y_test), shuffle=True)
         # Test
         test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset)
         # Denormalize

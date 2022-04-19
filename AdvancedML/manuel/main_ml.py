@@ -32,6 +32,8 @@ def forecast(model, X, past_history, n_variables):
             new_X = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
             new_X = new_X.reshape(1, new_X.shape[0] * new_X.shape[1])
             local_forecast = model.predict(new_X)
+            if len(local_forecast.shape) > 1:
+                local_forecast = np.squeeze(local_forecast, 1)
             forecast.append(local_forecast)
         else:
             x_cam = np.squeeze(np.array(forecast[-past_history:]),1)
@@ -39,6 +41,8 @@ def forecast(model, X, past_history, n_variables):
             new_X = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
             new_X = new_X.reshape(1, new_X.shape[0] * new_X.shape[1])
             local_forecast = model.predict(new_X)
+            if len(local_forecast.shape) > 1:
+                local_forecast = np.squeeze(local_forecast, 1)
             forecast.append(local_forecast)
     return np.array(forecast).squeeze(1)
 

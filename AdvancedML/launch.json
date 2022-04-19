@@ -6,10 +6,10 @@
     "configurations": [
 
         {
-            "name": "Python: Current File",
+            "name": "NewDataset",
             "type": "python",
             "request": "launch",
-            "program": "Main_Net.py",
+            "program": "NewDataset.py",
             "console": "integratedTerminal"
         }
     ]

@@ -174,7 +174,7 @@ if __name__ == "__main__":
     train_forecast=reg.predict(X_train)
     test_forecast=reg.predict(X_test)
 
-    plotting_1(y_train,train_forecast,y_test, test_forecast, 500)
+    plotting_1(y_train,train_forecast,y_test, test_forecast, 0)
     plotting_4(y_train, train_forecast, y_test, test_forecast)
     std_data_train = np.std(y_train)
     std_train = np.std(y_train-train_forecast)    

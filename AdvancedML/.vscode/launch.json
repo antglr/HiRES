@@ -55,6 +55,14 @@
             "program": "Main_Net.py",
             "console": "integratedTerminal",
         },
+        {
+            "name": "New Dataset",
+            "type": "python",
+            "request": "launch",
+            "program": "NewDataset.py",
+            "console": "integratedTerminal",
+            "cwd": "/home/manuel/HiRES/AdvancedML/",
+        },
 
     ]
 }

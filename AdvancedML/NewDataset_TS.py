@@ -173,11 +173,27 @@ def windows_preprocessing(time_series, past_history, forecast_horizon):
         y.append(camera_series[j: j + forecast_horizon])
     return np.array(x), np.array(y)
 
+def windows_preprocessing2(time_series, past_history, forecast_horizon):
+    x, y = [], []
+    camera_series = time_series[0]
+    time_series = time_series[1:] # This line removes cam from the X
+    for j in range(past_history, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
+        indices = list(range(j - past_history, j+1))
+
+        window_ts = []
+        for i in range(time_series.shape[0]):
+            window_ts.append(time_series[i, indices])
+        window = np.array(window_ts).transpose((1,0))
+
+        x.append(window)
+        y.append(camera_series[j: j + forecast_horizon])
+    return np.array(x), np.array(y)
+
 def root_mean_squared_error(y_true, y_pred):
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
 def lstm():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    x = tf.keras.layers.LSTM(units=300, return_sequences=False)(inputs)
+    x = tf.keras.layers.LSTM(units=100, return_sequences=False)(inputs)
     x = tf.keras.layers.Flatten()(x)
     x = tf.keras.layers.Dense(64, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
@@ -409,7 +425,7 @@ if __name__ == "__main__":
     t = time.time()
     
     percentage = 0.8 
-    past_history = 1
+    past_history = 0
     forecast_horizon = 1
     
     normalization_method = 'None'
@@ -417,7 +433,7 @@ if __name__ == "__main__":
     splitting_traintest = 1
     fetureSelection = 0
 
-    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+    # filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
     dict = loadmat(filname)
     x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs_amp, laser_phs_ph, cam = to_dataframe(dict) 
@@ -446,29 +462,38 @@ if __name__ == "__main__":
         # Normalization
         train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
         # Windowing
-        X_train, Y_train = windows_preprocessing(train, past_history, forecast_horizon)
-        X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
+        X_train, Y_train = windows_preprocessing2(train, past_history, forecast_horizon)
+        X_test, Y_test = windows_preprocessing2(test, past_history, forecast_horizon)
         # Model
         
         # Models from SkLearn (LR, RF, MLP)
         X_train, X_test = X_train.reshape(X_train.shape[0], -1), X_test.reshape(X_test.shape[0], -1)
         model = LinearRegression()
         # model = RandomForestRegressor()
+        # model = MLPRegressor(hidden_layer_sizes=(32,16), max_iter=2000)
         model.fit(X_train,Y_train)
         
         
         # Deep Learning
-        # model = mlp()
-        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss=tf.keras.losses.MeanSquaredError())  
+        # model = lstm()
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')  
         # callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
         # # history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=(0.1), shuffle=True)
         # history = model.fit(X_train,Y_train,batch_size=64, epochs=20, validation_data=(X_test,Y_test), shuffle=True)
         
         train_forecast = model.predict(X_train)
-        
+        plt.figure()
+        plt.plot(train_forecast[:10], label="pred")
+        plt.plot(Y_train[:10],label="gt")
+        plt.legend()
+        plt.savefig("p1.png")
         # test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset, model=model) # TODO: Check this function 
         test_forecast = model.predict(X_test)
-        # test_forecast = np.roll(test_forecast, -1)
+        plt.figure()
+        plt.plot(test_forecast[:10], label="pred")
+        plt.plot(Y_test[:10],label="gt")
+        plt.legend()
+        plt.savefig("p2.png")
         
         # Denormalize
         train_forecast, metrics_train, Y_train_denorm= denormalization(forecast=train_forecast, X=X_train, Y = Y_train, norm_params= norm_params, normalization_method= normalization_method)
@@ -487,8 +512,8 @@ if __name__ == "__main__":
         # Plotting
         # plotting_1(history,i)
         plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
-        # plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = 50)
-        plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = len(train_forecast))
+        plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = 100)
+        # plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = len(train_forecast))
         plotting_4(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
 
 

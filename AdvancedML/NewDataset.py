@@ -1,5 +1,7 @@
 from calendar import c
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import time
@@ -54,7 +56,7 @@ def to_dataframe(dictionary):
     dataset = pd.DataFrame({'x_Laser': dict["LCam1_Gauss"][:,0], 'xRMS_Laser': dict["LCam1_Gauss"][:,1], 'y_Laser': dict["LCam1_Gauss"][:,2], 'yRMS_Laser': dict["LCam1_Gauss"][:,3], 
                             'u_Laser': dict["LCam1_Gauss"][:,4], 'uRMS_Laser': dict["LCam1_Gauss"][:,5], 'v_Laser': dict["LCam1_Gauss"][:,6], 'vRMS_Laser': dict["LCam1_Gauss"][:,7], 
                             'sum_Laser': dict["LCam1_Gauss"][:,8], 'rf_amp': dict["Cav_Amp"],  'rf_phs': dict["Cav_Phs"],  'fw2_amp': dict["Fwd2_Amp"],  'fw2_phs': dict["Fwd2_Phs"], 
-                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"], 'laser_phs': dict["LP_Amp"], 'laser_phs': dict["LP_Phase"]})
+                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"], 'laser_phs_amp': dict["LP_Amp"], 'laser_phs_ph': dict["LP_Phase"]})
     cam = dict["AdjUCam1Pos"]
     return dataset, cam
 
@@ -161,16 +163,20 @@ if __name__ == "__main__":
     
     
     
-    dataset,C_mean,C_std = normalization(dataset)
+    # dataset,C_mean,C_std = normalization(dataset)
     stop = int(0.8*len(dataset))
+    print(stop)
     #X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2)
     X_train = dataset.iloc[:stop]
     X_test = dataset.iloc[stop:]
     y_train = cam[:stop]
     y_test = cam[stop:]
     
-    #reg = LinearRegression().fit(X_train, y_train)
-    reg = MLPRegressor(hidden_layer_sizes=(64,64,64),activation="relu" ,random_state=42, max_iter=2000).fit(X_train, y_train)
+    print("X_train", X_train.shape)
+    print("X_test", X_test.shape)
+    print(X_train.iloc[0])
+    reg = LinearRegression().fit(X_train, y_train)
+    # reg = MLPRegressor(hidden_layer_sizes=(64,64,64),activation="relu" ,random_state=42, max_iter=2000).fit(X_train, y_train)
     train_forecast=reg.predict(X_train)
     test_forecast=reg.predict(X_test)
 

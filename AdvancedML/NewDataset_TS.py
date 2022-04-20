@@ -1,6 +1,8 @@
 from calendar import c
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use("Agg")
 import pandas as pd
 import time
 import scipy.io
@@ -8,6 +10,7 @@ import click
 import scipy.io as sio
 from sklearn.model_selection import train_test_split
 from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor  
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.linear_model import LinearRegression
@@ -73,11 +76,11 @@ def to_dataframe(dictionary):
     rv_phs = dict["Rev_Phs"]
     fw1_amp = dict["Fwd1_Amp"]
     fw1_phs = dict["Fwd1_Phs"]
-    laser_phs = dict["LP_Amp"]
-    laser_phs = dict["LP_Phase"]
+    laser_phs_amp = dict["LP_Amp"]
+    laser_phs_ph = dict["LP_Phase"]
     
     cam = dict["AdjUCam1Pos"]
-    return  x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs, laser_phs, cam
+    return  x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs_amp, laser_phs_ph, cam
 
 def get_normalization_params(data):
     """
@@ -186,7 +189,7 @@ def lstm():
 def mlp():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
     x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(1024, activation='tanh')(x)
+    x = tf.keras.layers.Dense(1024, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
     x = tf.keras.layers.Dense(512, activation='relu')(x)
     x = tf.keras.layers.Dropout(0.1)(x)
@@ -212,7 +215,7 @@ def cnn():
     model = tf.keras.Model(inputs=inputs, outputs=x)
     return model
 
-def testing(X_test, past_history, FullDataset):
+def testing(X_test, past_history, FullDataset, model):
     test_forecast = []
     X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))        
     for k in range(len(X_test)):        
@@ -229,17 +232,27 @@ def testing(X_test, past_history, FullDataset):
                 x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) 
             x_external = X_test2[k,:,1:]
             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
-            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
-            local_forecast = model(new_X_test)
+            if "sklearn" in str(type(model)):
+                new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            else:
+                new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
+            
+            local_forecast = model.predict(new_X_test)
             test_forecast.append(local_forecast)
         else:
             x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
             x_external = X_test2[k,:,1:]
             new_X_test = np.concatenate((x_cam,x_external),axis=1)
-            new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
-            local_forecast = model(new_X_test)
+            if "sklearn" in str(type(model)):
+                new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
+            else:
+                new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
+            local_forecast = model.predict(new_X_test)
             test_forecast.append(local_forecast)
     return test_forecast
+
+
+
 
 def plotting_1(history,i):
     train_loss = history.history['loss']
@@ -305,8 +318,8 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, r):
     ax2.grid(axis="x")
     ax2.grid(axis="y")
     ax2.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
-    ax3.plot(np.squeeze(Y_test),"r",label= "Label")
-    ax3.plot(test_forecast,"k",label= "Prediction")
+    ax3.plot(np.squeeze(Y_test[:r]),"r",label= "Label")
+    ax3.plot(test_forecast[:r],"k",label= "Prediction")
     ax3.plot(RMS_test, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_test, precision=2)))
     ax3.plot(RMSE_test, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_test, precision=2)))
     ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
@@ -317,7 +330,7 @@ def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, r):
     ax3.grid(axis="y")
     ax3.set_ylim((minimo, massimo))
     ax3.legend()
-    ax4.plot(np.squeeze(Y_test) - test_forecast, "b", label= "Label - Prediction")
+    ax4.plot(np.squeeze(Y_test[:r]) - test_forecast[:r], "b", label= "Label - Prediction")
     ax4.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
     ax4.set_ylabel("|Label - Prediction|")
     ax4.set_xlabel("Time")
@@ -395,11 +408,11 @@ if __name__ == "__main__":
     clrscr()
     t = time.time()
     
-    percentage = 0.9 
-    past_history = 30
+    percentage = 0.8 
+    past_history = 1
     forecast_horizon = 1
     
-    normalization_method = 'zscore'
+    normalization_method = 'None'
     
     splitting_traintest = 1
     fetureSelection = 0
@@ -407,12 +420,12 @@ if __name__ == "__main__":
     #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
     dict = loadmat(filname)
-    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs, laser_phs, cam = to_dataframe(dict) 
+    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs_amp, laser_phs_ph, cam = to_dataframe(dict) 
     
     if fetureSelection:
         FullDataset = np.array([cam, x_Laser]) 
     else:
-        FullDataset = np.array([cam, x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs, laser_phs])    
+        FullDataset = np.array([cam, x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_phs_amp, laser_phs_ph])    
     traintest_size = len(cam)//splitting_traintest
     split = int(traintest_size*percentage)
 
@@ -436,15 +449,27 @@ if __name__ == "__main__":
         X_train, Y_train = windows_preprocessing(train, past_history, forecast_horizon)
         X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
         # Model
-        model = cnn()
-
-
-        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss=tf.keras.losses.MeanSquaredError())  
-        callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
-        history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=0.1, shuffle=False)
-        train_forecast = model(X_train).numpy()
-        # Test
-        test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset)
+        
+        # Models from SkLearn (LR, RF, MLP)
+        X_train, X_test = X_train.reshape(X_train.shape[0], -1), X_test.reshape(X_test.shape[0], -1)
+        model = LinearRegression()
+        # model = RandomForestRegressor()
+        model.fit(X_train,Y_train)
+        
+        
+        # Deep Learning
+        # model = mlp()
+        # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss=tf.keras.losses.MeanSquaredError())  
+        # callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
+        # # history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=(0.1), shuffle=True)
+        # history = model.fit(X_train,Y_train,batch_size=64, epochs=20, validation_data=(X_test,Y_test), shuffle=True)
+        
+        train_forecast = model.predict(X_train)
+        
+        # test_forecast = testing(X_test = X_test, past_history = past_history, FullDataset = FullDataset, model=model) # TODO: Check this function 
+        test_forecast = model.predict(X_test)
+        # test_forecast = np.roll(test_forecast, -1)
+        
         # Denormalize
         train_forecast, metrics_train, Y_train_denorm= denormalization(forecast=train_forecast, X=X_train, Y = Y_train, norm_params= norm_params, normalization_method= normalization_method)
         test_forecast, metrics_test, Y_test_denorm= denormalization(forecast=test_forecast, X=X_test, Y = Y_test, norm_params= norm_params, normalization_method= normalization_method)
@@ -460,8 +485,9 @@ if __name__ == "__main__":
         rmse_test.append(np.sqrt(np.mean((diff_test)**2)))
 
         # Plotting
-        plotting_1(history,i)
+        # plotting_1(history,i)
         plotting_2(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
+        # plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = 50)
         plotting_3(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i, r = len(train_forecast))
         plotting_4(train_forecast,Y_train_denorm,test_forecast,Y_test_denorm,i)
 

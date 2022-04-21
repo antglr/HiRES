@@ -1,9 +1,9 @@
+from cProfile import label
 from calendar import c
 import numpy as np
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import pandas as pd
+import pandas as pd 
+pd.options.mode.chained_assignment = None
 import time
 import scipy.io
 import click
@@ -13,6 +13,9 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor  
+from sklearn.decomposition import PCA
+
 
 
 def clrscr():
@@ -56,28 +59,36 @@ def to_dataframe(dictionary):
     dataset = pd.DataFrame({'x_Laser': dict["LCam1_Gauss"][:,0], 'xRMS_Laser': dict["LCam1_Gauss"][:,1], 'y_Laser': dict["LCam1_Gauss"][:,2], 'yRMS_Laser': dict["LCam1_Gauss"][:,3], 
                             'u_Laser': dict["LCam1_Gauss"][:,4], 'uRMS_Laser': dict["LCam1_Gauss"][:,5], 'v_Laser': dict["LCam1_Gauss"][:,6], 'vRMS_Laser': dict["LCam1_Gauss"][:,7], 
                             'sum_Laser': dict["LCam1_Gauss"][:,8], 'rf_amp': dict["Cav_Amp"],  'rf_phs': dict["Cav_Phs"],  'fw2_amp': dict["Fwd2_Amp"],  'fw2_phs': dict["Fwd2_Phs"], 
-                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"], 'laser_phs_amp': dict["LP_Amp"], 'laser_phs_ph': dict["LP_Phase"]})
+                            'rv_amp': dict["Rev_Amp"],  'rv_phs': dict["Rev_Phs"],  'fw1_amp': dict["Fwd1_Amp"],  'fw1_phs': dict["Fwd1_Phs"], 'laser_phs': dict["LP_Amp"], 'laser_phs': dict["LP_Phase"]})
     cam = dict["AdjUCam1Pos"]
     return dataset, cam
 
-def normalization(dataset):
+def normalization_train(dataset):
     C_mean = []
     C_std = []
     for column in dataset.columns:
         column_mean = dataset[column].mean()
         column_std = dataset[column].std()
-        dataset[column] = (dataset[column] - column_mean) / column_std
+        dataset.loc[:,column] = (dataset[column] - column_mean) / column_std
         C_mean.append(column_mean)
         C_std.append(column_std)
     return dataset,C_mean,C_std
-def denormalization(C_mean, C_std, dataset):
+def normalization_test(dataset, C_mean, C_std):
     i = 0
     for column in dataset.columns:
         column_mean = C_mean[i]
         column_std = C_std[i]
-        dataset[column] = (dataset[column] * column_std) + column_mean
+        dataset.loc[:,column]  = (dataset[column] - column_mean) / column_std
         i += 1 
     return dataset
+# def denormalization(C_mean, C_std, dataset):
+#     i = 0
+#     for column in dataset.columns:
+#         column_mean = C_mean[i]
+#         column_std = C_std[i]
+#         dataset[column] = (dataset[column] * column_std) + column_mean
+#         i += 1 
+#     return dataset
 
 def plotting_1(y_train,train_forecast,y_test, test_forecast, l): 
     if (l==0):
@@ -155,30 +166,44 @@ def plotting_4(y_train, train_forecast, y_test, test_forecast):
 if __name__ == "__main__":
     clrscr()
     
-    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     dict = loadmat(filname)
     # print(dict["syncData"])
     dataset, cam = to_dataframe(dict) # X and Y
     
     
-    
-    # dataset,C_mean,C_std = normalization(dataset)
+    # dataset.drop(dataset.tail(500).index, inplace = True)
+    # cam = cam[:-500]
+    #X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2, shuffle=False)
     stop = int(0.8*len(dataset))
-    print(stop)
-    #X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2)
     X_train = dataset.iloc[:stop]
     X_test = dataset.iloc[stop:]
     y_train = cam[:stop]
     y_test = cam[stop:]
+    print(np.shape(X_train))
+    print(np.shape(X_test))
     
-    print("X_train", X_train.shape)
-    print("X_test", X_test.shape)
-    print(X_train.iloc[0])
-    reg = LinearRegression().fit(X_train, y_train)
-    # reg = MLPRegressor(hidden_layer_sizes=(64,64,64),activation="relu" ,random_state=42, max_iter=2000).fit(X_train, y_train)
-    train_forecast=reg.predict(X_train)
-    test_forecast=reg.predict(X_test)
+    
+    X_train,C_mean,C_std = normalization_train(X_train)
+    X_test = normalization_test(X_test, C_mean, C_std)
+    # pca = PCA(n_components=0.90)
+    # X_Train_new = pca.fit_transform(X_train) 
+    # X_Test_new = pca.transform(X_test) 
+    # #X_train, X_test = X_train.reshape(X_train.shape[0], -1), X_test.reshape(X_test.shape[0], -1)
+    
+    
+    #model = RandomForestRegressor().fit(X_train, y_train)
+    #model = LinearRegression().fit(X_train, y_train)
+    model = MLPRegressor(hidden_layer_sizes=(64,64,64), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
+                          activation="relu" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True, 
+                          validation_fraction=0.1, n_iter_no_change=30, verbose=0).fit(X_train, y_train)
+    plt.plot(model.loss_curve_,'r',label="loss_curve")
+    plt.legend()
+    plt.show()
+    plt.savefig("01_loss_curve.png")
+    train_forecast=model.predict(X_train)
+    test_forecast=model.predict(X_test)
 
     plotting_1(y_train,train_forecast,y_test, test_forecast, 0)
     plotting_4(y_train, train_forecast, y_test, test_forecast)
@@ -210,9 +235,6 @@ if __name__ == "__main__":
     print("STD (Lable - Prediction)  --------------------------------------->",round(std_test, 3))
     print("RMSE ------------------------------------------------------------>",round(rmse_test, 3))
     print("-----------------------------------------------------------------------------------") 
+
     
-    
-    
-    
-    
-    
+    #Addestra con i non stabilizzati e testa sugli stabilizzati

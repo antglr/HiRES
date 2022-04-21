@@ -330,7 +330,7 @@ def plotting_correlation(x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS
     axs[4,3].grid(axis="y")
     axs[4,3].legend()
     fig.tight_layout()
-    save_name = "First200Variable.png"
+    save_name = "Correlations.png"
     plt.savefig(save_name)
     return 
 
@@ -340,8 +340,9 @@ if __name__ == "__main__":
     clrscr()
     t = time.time()
     
-    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
-    filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    #filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+
     dict = loadmat(filname)
     x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict) 
     

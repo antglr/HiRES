@@ -84,11 +84,6 @@ def to_dataframe(dictionary):
     return  x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam
 
 def get_normalization_params(data):
-    """
-    Obtain parameters for normalization
-    :param data: time series
-    :return: dict with string keys
-    """
     d = data.flatten()
     norm_params = {}
     norm_params["mean"] = d.mean()
@@ -97,13 +92,6 @@ def get_normalization_params(data):
     norm_params["min"] = d.min()
     return norm_params
 def normalize(data, norm_params, normalization_method="zscore"):
-    """
-    Normalize time series
-    :param data: time series
-    :param norm_params: tuple with params mean, std, max, min
-    :param method: zscore or minmax
-    :return: normalized time series
-    """
     assert normalization_method in ["zscore", "minmax", "None"]
     if normalization_method == "zscore":
         std = norm_params["std"]
@@ -117,32 +105,6 @@ def normalize(data, norm_params, normalization_method="zscore"):
         return (data - norm_params["min"]) / denominator
     elif normalization_method == "None":
         return data
-def denormalize(data, norm_params, normalization_method="zscore"):
-    """
-    Reverse normalization time series
-    :param data: normalized time series
-    :param norm_params: tuple with params mean, std, max, min
-    :param normalization_method: zscore or minmax
-    :return: time series in original scale
-    """
-    assert normalization_method in ["zscore", "minmax", "None"]
-    if normalization_method == "zscore":
-        return (data * norm_params["std"]) + norm_params["mean"]
-    elif normalization_method == "minmax":
-        return data * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
-    elif normalization_method == "None":
-        return data
-def denormalization(forecast, Y, norm_params, normalization_method):
-    #forecast2 = model(X).numpy()
-    #print(np.all(forecast2==forecast))
-    Y_denorm = np.zeros(Y.shape)
-    for j in range(Y.shape[0]):
-        nparams = norm_params[0]
-        forecast[j] = denormalize(forecast[j], nparams, normalization_method)
-        Y_denorm[j] = denormalize(Y[j], nparams, normalization_method)
-    forecast = np.squeeze(forecast)
-    metrics_train = np.abs(forecast-np.squeeze(Y_denorm))
-    return forecast, metrics_train, Y_denorm
 def normalize_dataset(train, test, normalization_method, dtype="float32"):
     # Normalize train data
     norm_params = []
@@ -155,18 +117,35 @@ def normalize_dataset(train, test, normalization_method, dtype="float32"):
     for i in range(test.shape[0]):
         nparams = norm_params[i]
         test[i] = normalize(test[i], nparams, normalization_method)
-
     return train, test, norm_params
+
+def denormalize(data, norm_params, normalization_method="zscore"):
+    assert normalization_method in ["zscore", "minmax", "None"]
+    if normalization_method == "zscore":
+        return (data * norm_params["std"]) + norm_params["mean"]
+    elif normalization_method == "minmax":
+        return data * (norm_params["max"] - norm_params["min"]) + norm_params["min"]
+    elif normalization_method == "None":
+        return data
+def denormalization(forecast, Y, norm_params, normalization_method):
+    Y_denorm = np.zeros(Y.shape)
+    for j in range(Y.shape[0]):
+        nparams = norm_params[0]
+        forecast[j] = denormalize(forecast[j], nparams, normalization_method)
+        Y_denorm[j] = denormalize(Y[j], nparams, normalization_method)
+    forecast = np.squeeze(forecast)
+    Y_denorm = np.squeeze(Y_denorm)
+    return forecast, Y_denorm
 
 def windows_preprocessing_Antonio(time_series, past_history):
     x, y = [], []
-    camera_series = time_series[0]
+    camera_series = time_series[0].copy()
     #time_series = time_series[1:] # This line removes cam from the X
     for j in range(past_history, time_series.shape[1]):
         indices = list(range(j - past_history, j+1))
         
-        window_ts = time_series[:, indices]
-        window_ts[0,-1] = 0 # Remove (Zero) the value of the cam to be guessed
+        window_ts = time_series[:, indices].copy()
+        window_ts[0,-1] = np.mean(window_ts[0,:-1]) # Remove (Zero) the value of the cam to be guessed -- To improve!!!!!!!
         window = np.array(window_ts).transpose((1,0))
         x.append(window)
         
@@ -176,16 +155,16 @@ def windows_preprocessing_Antonio(time_series, past_history):
 def testing(X_test, past_history, model):
     test_forecast = []
     lastguess = 0
+    X_test_copy = X_test.copy()
     for k in range(past_history, np.shape(X_test)[1]):        
         indices = list(range(k - past_history, k+1))
         
-        X_test_new = X_test[:, indices]
-        X_test_new[0,-1] = lastguess 
+        X_test_copy[0,indices[-1]] = lastguess
+        X_test_new = X_test_copy[:, indices].copy()
+        #X_test_new[0,-1] = lastguess 
         X_test_new = np.array(X_test_new).transpose((1,0))
          
-        #X_test_new = X_test_new.reshape(X_test_new.shape[0], -1) 
         X_test_new = X_test_new.reshape(1,-1)
-        #X_test_new = X_test_new.reshape(-1, 1)  
         lastguess = model.predict(X_test_new)
         test_forecast.append(lastguess)
     return test_forecast
@@ -195,15 +174,13 @@ if __name__ == "__main__":
     t = time.time()
     
     past_history = 20
-    normalization_method = 'zscore'
+    normalization_method = 'minmax'
     #"zscore", "minmax",
-    splitting_traintest = 1
     fetureSelection = 0
-    plt_len = 100
+    plt_len = 2000
 
-
-    #filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
-    filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+    filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     
     dict = loadmat(filname)
     x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict) 
@@ -216,20 +193,17 @@ if __name__ == "__main__":
 
     start_train = 0
     stop_train = int(len(cam)*0.8)
-    start_test = stop_train + 1
-    stop_test = len(cam)
-    print("Train start--stop:",start_train,"--",stop_train)
-    print("Test start--stop:",start_test,"--",stop_test)
+    print("Train start--stop:",start_train,"--",stop_train-1)
+    print("Test start--stop:",stop_train,"--",len(cam))
     print("")
     
-    train, test = FullDataset[:,start_train:stop_train], FullDataset[:,start_test:stop_test]
+    train, test = FullDataset[:,start_train:stop_train], FullDataset[:,stop_train:]
     train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
     
+    #Only TRAIN
     X_train, Y_train = windows_preprocessing_Antonio(train, past_history)
-    
-    print(np.shape(Y_train))
     X_train= X_train.reshape(X_train.shape[0], -1)
-    model = MLPRegressor(hidden_layer_sizes=(64,64,64), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
+    model = MLPRegressor(hidden_layer_sizes=(64,64,64,64,148), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
                         activation="relu" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True, 
                         validation_fraction=0.1, n_iter_no_change=30, verbose=0).fit(X_train, Y_train)    
     train_forecast = model.predict(X_train)
@@ -239,9 +213,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig("p1.png")
     
-    train_forecast, metrics_train, Y_train_denorm= denormalization(train_forecast, Y_train, norm_params, normalization_method)
-    Y_train_denorm = np.squeeze(Y_train_denorm)
-
+    train_forecast, Y_train_denorm= denormalization(train_forecast, Y_train, norm_params, normalization_method)
     std_data_train = np.std(Y_train_denorm)
     rms_train = np.sqrt(np.mean(Y_train_denorm**2))
     std_train = np.std(Y_train_denorm-train_forecast)    
@@ -258,22 +230,16 @@ if __name__ == "__main__":
     print("")
     print("")
     
-    elapsed = time.time() - t
-    print("TIME:",elapsed)
-
-    
-    #X_test, Y_test = windows_preprocessing_Antonio(test, past_history)
-    
-    test_forecast = testing(test, past_history, model) 
     Y_test = test[0,past_history:]
+    test_forecast = testing(test, past_history, model) 
+    
     plt.figure()
     plt.plot(test_forecast[:plt_len], label="pred")
     plt.plot(Y_test[:plt_len],label="gt")
     plt.legend()
     plt.savefig("p2.png")
     
-    test_forecast, metrics_test, Y_test_denorm= denormalization(test_forecast, Y_test, norm_params, normalization_method)
-    Y_test_denorm = np.squeeze(Y_test_denorm)
+    test_forecast, Y_test_denorm= denormalization(test_forecast, Y_test, norm_params, normalization_method)    
     
     std_data_test = np.std(Y_test_denorm)
     rms_test = np.sqrt(np.mean(Y_test_denorm**2))
@@ -288,7 +254,8 @@ if __name__ == "__main__":
     print("RMSE ------------------------------------------------------------>",round(rmse_test, 3))
     print("-----------------------------------------------------------------------------------") 
 
-    
+    elapsed = time.time() - t
+    print("TIME:",elapsed)
 ################################################################################################################
 ################################################################################################################
 ################################################################################################################

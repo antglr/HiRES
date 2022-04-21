@@ -173,17 +173,16 @@ if __name__ == "__main__":
     dataset, cam = to_dataframe(dict) # X and Y
     
     
-    # dataset.drop(dataset.tail(500).index, inplace = True)
-    # cam = cam[:-500]
+    dataset.drop(dataset.tail(500).index, inplace = True)
+    cam = cam[:-500]
+    
     #X_train, X_test, y_train, y_test = train_test_split(dataset, cam, random_state=42, test_size=0.2, shuffle=False)
     stop = int(0.8*len(dataset))
     X_train = dataset.iloc[:stop]
     X_test = dataset.iloc[stop:]
     y_train = cam[:stop]
     y_test = cam[stop:]
-    print(np.shape(X_train))
-    print(np.shape(X_test))
-    
+
     
     X_train,C_mean,C_std = normalization_train(X_train)
     X_test = normalization_test(X_test, C_mean, C_std)

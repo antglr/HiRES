@@ -300,6 +300,10 @@ def loading(InOrOut, both, targetShift):
     return OL_phs, OL_amp, ILmOL_phs, ILmOL_amp, laser_Phs, laser_amp, Egain, cam
 
 def root_mean_squared_error(y_true, y_pred):
+    print(type(y_true))
+    print(type(y_pred))
+    print("y_pred:",y_pred)
+    print("y_true:",y_true)
     return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
 def lstm():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
@@ -379,7 +383,7 @@ if __name__ == "__main__":
     past_history = 60
     forecast_horizon = 1
     normalization_method = 'zscore'
-    fetureSelection = 1
+    fetureSelection = 0
 
     #InLoop
     OL_phs,OL_amp,ILmOL_phs,ILmOL_amp,laser_Phs,laser_amp,Egain,cam = loading(InOrOut = "OutLoop", both = False, targetShift = -2)
@@ -413,6 +417,11 @@ if __name__ == "__main__":
         X_test, Y_test = windows_preprocessing(test, past_history, forecast_horizon)
   
         # Model
+        
+        print("X_train",type(X_train))
+        print("X_train",np.shape(X_train))
+        print("Y_train",type(Y_train))
+        print("Y_train",np.shape(Y_train))
         model = lstm()
         # model = mlp()
         # model = cnn()

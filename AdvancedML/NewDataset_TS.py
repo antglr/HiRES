@@ -1,20 +1,12 @@
-from calendar import c
-from operator import length_hint
 import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use("Agg")
-import pandas as pd
-import time
-import scipy.io
-import click
-import scipy.io as sio
-from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPRegressor
-from sklearn.ensemble import RandomForestRegressor  
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import TimeSeriesSplit
+import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error, mean_absolute_percentage_error
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import TimeSeriesSplit
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -22,30 +14,32 @@ import tensorflow.keras.backend as K
 import scipy.io as sio
 import pandas as pd
 import time
+from sklearn.linear_model import SGDRegressor
+import click
 
 def clrscr():
     click.clear()
-def _check_keys( dict):
+def _check_keys(dict_value):
     """
     checks if entries in dictionary are mat-objects. If yes
     todict is called to change them to nested dictionaries
     """
-    for key in dict:
-        if isinstance(dict[key], sio.matlab.mio5_params.mat_struct):
-            dict[key] = _todict(dict[key])
-    return dict
+    for key in dict_value:
+        if isinstance(dict_value[key], sio.matlab.mio5_params.mat_struct):
+            dict_value[key] = _todict(dict_value[key])
+    return dict_value
 def _todict(matobj):
     """
     A recursive function which constructs from matobjects nested dictionaries
     """
-    dict = {}
+    dict_value = {}
     for strg in matobj._fieldnames:
         elem = matobj.__dict__[strg]
         if isinstance(elem, sio.matlab.mio5_params.mat_struct):
-            dict[strg] = _todict(elem)
+            dict_value[strg] = _todict(elem)
         else:
-            dict[strg] = elem
-    return dict
+            dict_value[strg] = elem
+    return dict_value
 def loadmat(filename):
     """
     this function should be called instead of direct scipy.io .loadmat
@@ -57,30 +51,30 @@ def loadmat(filename):
     return _check_keys(data)
 
 def to_dataframe(dictionary):
-    dict = dictionary["syncData"]
+    full_data = dictionary["syncData"]
     
-    x_Laser = dict["LCam1_Gauss"][:,0]
+    x_Laser = full_data["LCam1_Gauss"][:,0]
     
-    xRMS_Laser = dict["LCam1_Gauss"][:,1]
-    y_Laser = dict["LCam1_Gauss"][:,2]
-    yRMS_Laser = dict["LCam1_Gauss"][:,3]
-    u_Laser = dict["LCam1_Gauss"][:,4]
-    uRMS_Laser = dict["LCam1_Gauss"][:,5]
-    v_Laser = dict["LCam1_Gauss"][:,6]
-    vRMS_Laser = dict["LCam1_Gauss"][:,7]
-    sum_Laser = dict["LCam1_Gauss"][:,8]
-    rf_amp = dict["Cav_Amp"]
-    rf_phs = dict["Cav_Phs"]
-    fw2_amp =dict["Fwd2_Amp"] 
-    fw2_phs =dict["Fwd2_Phs"] 
-    rv_amp = dict["Rev_Amp"]
-    rv_phs = dict["Rev_Phs"]
-    fw1_amp = dict["Fwd1_Amp"]
-    fw1_phs = dict["Fwd1_Phs"]
-    laser_amp = dict["LP_Amp"]
-    laser_phs = dict["LP_Phase"]
+    xRMS_Laser = full_data["LCam1_Gauss"][:,1]
+    y_Laser = full_data["LCam1_Gauss"][:,2]
+    yRMS_Laser = full_data["LCam1_Gauss"][:,3]
+    u_Laser = full_data["LCam1_Gauss"][:,4]
+    uRMS_Laser = full_data["LCam1_Gauss"][:,5]
+    v_Laser = full_data["LCam1_Gauss"][:,6]
+    vRMS_Laser = full_data["LCam1_Gauss"][:,7]
+    sum_Laser = full_data["LCam1_Gauss"][:,8]
+    rf_amp = full_data["Cav_Amp"]
+    rf_phs = full_data["Cav_Phs"]
+    fw2_amp =full_data["Fwd2_Amp"] 
+    fw2_phs =full_data["Fwd2_Phs"] 
+    rv_amp = full_data["Rev_Amp"]
+    rv_phs = full_data["Rev_Phs"]
+    fw1_amp = full_data["Fwd1_Amp"]
+    fw1_phs = full_data["Fwd1_Phs"]
+    laser_amp = full_data["LP_Amp"]
+    laser_phs = full_data["LP_Phase"]
     
-    cam = dict["AdjUCam1Pos"]
+    cam = full_data["AdjUCam1Pos"]
     return  x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam
 
 def get_normalization_params(data):
@@ -145,7 +139,7 @@ def windows_preprocessing_Antonio(time_series, past_history):
         indices = list(range(j - past_history, j+1))
         
         window_ts = time_series[:, indices].copy()
-        window_ts[0,-1] = np.mean(window_ts[0,:-1]) # Remove (Zero) the value of the cam to be guessed -- To improve!!!!!!!
+        window_ts[0,-1] = 0 #np.mean(window_ts[0,:-1]) # Remove (Zero) the value of the cam to be guessed -- To improve!!!!!!!
         window = np.array(window_ts).transpose((1,0))
         x.append(window)
         
@@ -154,8 +148,9 @@ def windows_preprocessing_Antonio(time_series, past_history):
 
 def testing(X_test, past_history, model):
     test_forecast = []
-    lastguess = 0
+    #lastguess = 0
     X_test_copy = X_test.copy()
+    lastguess = 0 #np.mean(X_test_copy[:, :past_history-1])
     for k in range(past_history, np.shape(X_test)[1]):        
         indices = list(range(k - past_history, k+1))
         
@@ -164,26 +159,80 @@ def testing(X_test, past_history, model):
         #X_test_new[0,-1] = lastguess 
         X_test_new = np.array(X_test_new).transpose((1,0))
          
-        X_test_new = X_test_new.reshape(1,-1)
-        lastguess = model.predict(X_test_new)
+        X_test_new = X_test_new.reshape(1,-1) #MLP - LR 
+        #X_test_new = X_test_new.reshape(1,*np.shape(X_test_new)) # LST
+        lastguess = model.predict(X_test_new).flatten()
         test_forecast.append(lastguess)
-    return test_forecast
+    return np.array(test_forecast)
+
+def root_mean_squared_error(y_true, y_pred):
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
+def lstm():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.LSTM(units=128, return_sequences=False)(inputs)
+    x = tf.keras.layers.Flatten()(x)
+    x = tf.keras.layers.Dense(128, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(1)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+def cnn():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
+    x = tf.keras.layers.Conv1D(148, 3, activation="relu", padding="same")(inputs)
+    x = tf.keras.layers.MaxPool1D(pool_size=2)(x)    
+    x = tf.keras.layers.Flatten()(inputs)
+    x = tf.keras.layers.Dense(64, activation='relu')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    x = tf.keras.layers.Dense(1)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+
+def plotting_1(y_train,train_forecast,y_test, test_forecast, l): 
+    if (l==0):
+        len1 = len(y_train)
+        len2 = len(train_forecast)
+    else:
+        len1 = l
+        len2 = l   
+    fig, (ax1, ax2) = plt.subplots(2, figsize=(16,6))
+    ax1.plot(y_train[:len1],'b',label="Label")
+    ax1.plot(train_forecast[:len1],'r', label="Prediction")
+    ax1.set_title('Train')
+    ax1.set_xlabel('N sample')
+    ax1.set_ylabel('Centroid [pixel]')
+    
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax1.legend()
+    ax2.plot(y_test[:len2],'b',label="Label")
+    ax2.plot(test_forecast[:len2],'r', label="Prediction")
+    ax2.set_title('Test')
+    ax2.set_xlabel('N sample')
+    ax2.set_ylabel('Centroid [pixel]')
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax2.legend()
+    ax2.set_xlabel('N sample')
+    ax2.set_ylabel('Centroid [pixel]')
+    plt.tight_layout()
+    plt.savefig("NewDataset_TS_Train_Test.png")
+    plt.show()
+    return
+
 
 if __name__ == "__main__":
     clrscr()
     t = time.time()
     
-    past_history = 20
+    past_history = 35
     normalization_method = 'minmax'
     #"zscore", "minmax",
     fetureSelection = 0
     plt_len = 2000
 
-    filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
-    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+    #filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
     
-    dict = loadmat(filname)
-    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict) 
+    dict_all = loadmat(filname)
+    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict_all) 
     x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam  = x_Laser[:-500], xRMS_Laser[:-500], y_Laser[:-500], yRMS_Laser[:-500], u_Laser[:-500], uRMS_Laser[:-500], v_Laser[:-500], vRMS_Laser[:-500], sum_Laser[:-500], rf_amp[:-500], rf_phs[:-500], fw2_amp[:-500], fw2_phs[:-500], rv_amp[:-500], rv_phs[:-500], fw1_amp[:-500], fw1_phs[:-500], laser_amp[:-500], laser_phs[:-500], cam[:-500] 
     
     if fetureSelection:
@@ -202,17 +251,19 @@ if __name__ == "__main__":
     
     #Only TRAIN
     X_train, Y_train = windows_preprocessing_Antonio(train, past_history)
+    # FOR Sklearn
     X_train= X_train.reshape(X_train.shape[0], -1)
-    model = MLPRegressor(hidden_layer_sizes=(64,64,64,64,148), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
-                        activation="relu" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True, 
-                        validation_fraction=0.1, n_iter_no_change=30, verbose=0).fit(X_train, Y_train)    
-    train_forecast = model.predict(X_train)
-    plt.figure()
-    plt.plot(train_forecast[:plt_len], label="pred")
-    plt.plot(Y_train[:plt_len],label="gt")
-    plt.legend()
-    plt.savefig("p1.png")
+    #model = MLPRegressor(hidden_layer_sizes=(148), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
+    #                     activation="relu" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True, 
+    #                     validation_fraction=0.1, n_iter_no_change=30, verbose=0).fit(X_train, Y_train)    
+    model = LinearRegression().fit(X_train, Y_train)
     
+    # model = cnn()
+    # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss=root_mean_squared_error)  
+    # callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
+    # history = model.fit(X_train, Y_train, batch_size=64, epochs=200, validation_split=(0.1), shuffle=True)
+    
+    train_forecast = model.predict(X_train)    
     train_forecast, Y_train_denorm= denormalization(train_forecast, Y_train, norm_params, normalization_method)
     std_data_train = np.std(Y_train_denorm)
     rms_train = np.sqrt(np.mean(Y_train_denorm**2))
@@ -231,14 +282,7 @@ if __name__ == "__main__":
     print("")
     
     Y_test = test[0,past_history:]
-    test_forecast = testing(test, past_history, model) 
-    
-    plt.figure()
-    plt.plot(test_forecast[:plt_len], label="pred")
-    plt.plot(Y_test[:plt_len],label="gt")
-    plt.legend()
-    plt.savefig("p2.png")
-    
+    test_forecast = testing(test, past_history, model)     
     test_forecast, Y_test_denorm= denormalization(test_forecast, Y_test, norm_params, normalization_method)    
     
     std_data_test = np.std(Y_test_denorm)
@@ -254,220 +298,9 @@ if __name__ == "__main__":
     print("RMSE ------------------------------------------------------------>",round(rmse_test, 3))
     print("-----------------------------------------------------------------------------------") 
 
+    plotting_1(Y_train_denorm,train_forecast, Y_test_denorm, test_forecast, l=0)
     elapsed = time.time() - t
     print("TIME:",elapsed)
 ################################################################################################################
 ################################################################################################################
 ################################################################################################################
-   
-   
-# def testing(X_test, past_history, FullDataset, model):
-#     test_forecast = []
-#     X_test2 = X_test.reshape(X_test.shape[0], past_history, len(FullDataset))        
-#     for k in range(len(X_test)):        
-#         if (len(test_forecast)<past_history):
-#             if (len(test_forecast)==0):
-#                 n_value_neede = past_history
-#                 x_cam_first =  X_test2[k, :n_value_neede, 0]
-#                 x_cam = x_cam_first 
-#             else:
-#                 x_cam_last = np.squeeze(np.array(test_forecast[-len(test_forecast):]),1)
-#                 n_value_neede = past_history - len(test_forecast)
-#                 x_cam_first =  X_test2[k, :n_value_neede, 0]
-#                 x_cam_last = np.array(x_cam_last).reshape(-1,)
-#                 x_cam = np.concatenate((x_cam_first,x_cam_last),axis=0) 
-#             x_external = X_test2[k,:,1:]
-#             new_X_test = np.concatenate((np.expand_dims(x_cam,1),x_external),axis=1)
-#             if "sklearn" in str(type(model)):
-#                 new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
-#             else:
-#                 new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
-            
-#             local_forecast = model.predict(new_X_test)
-#             test_forecast.append(local_forecast)
-#         else:
-#             x_cam = np.squeeze(np.array(test_forecast[-past_history:]),1)
-#             x_external = X_test2[k,:,1:]
-#             new_X_test = np.concatenate((x_cam,x_external),axis=1)
-#             if "sklearn" in str(type(model)):
-#                 new_X_test = new_X_test.reshape(1, new_X_test.shape[0] * new_X_test.shape[1])
-#             else:
-#                 new_X_test = new_X_test.reshape(1, new_X_test.shape[0] , new_X_test.shape[1])
-#             local_forecast = model.predict(new_X_test)
-#             test_forecast.append(local_forecast)
-#     return test_forecast
- 
-# # Deep Learning
-    # # model = lstm()
-    # # model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001), loss='mse')  
-    # # callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
-    # # # history = model.fit(X_train,Y_train,batch_size=64, epochs=100, validation_split=(0.1), shuffle=True)
-    # # history = model.fit(X_train,Y_train,batch_size=64, epochs=20, validation_data=(X_test,Y_test), shuffle=True)
-    
-
-# def windows_preprocessing(time_series, past_history, forecast_horizon):
-#     x, y = [], []
-#     camera_series = time_series[0]
-#     for j in range(past_history, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
-#         indices = list(range(j - past_history, j))
-
-#         window_ts = []
-#         for i in range(time_series.shape[0]):
-#             window_ts.append(time_series[i, indices])
-#         window = np.array(window_ts).transpose((1,0))
-
-#         x.append(window)
-#         y.append(camera_series[j: j + forecast_horizon])
-# #     return np.array(x), np.array(y)
-# def windows_preprocessing2(time_series, past_history, forecast_horizon):
-#     x, y = [], []
-#     camera_series = time_series[0]
-#     time_series = time_series[1:] # This line removes cam from the X
-#     for j in range(past_history, time_series.shape[1] - forecast_horizon + 1, forecast_horizon):
-#         indices = list(range(j - past_history, j+1))
-
-#         window_ts = []
-#         for i in range(time_series.shape[0]):
-#             window_ts.append(time_series[i, indices])
-#         window = np.array(window_ts).transpose((1,0))
-
-#         x.append(window)
-#         y.append(camera_series[j: j + forecast_horizon])
-#     return np.array(x), np.array(y)
-
-# def plotting_1(history,i):
-#     train_loss = history.history['loss']
-#     test_loss = history.history['val_loss']
-#     fig, ax = plt.subplots(figsize=(8,6))
-#     ax.plot(train_loss,"k",label="Training")
-#     ax.plot(test_loss,"r",label="Test")
-#     ax.set_xlabel("Epochs")
-#     ax.set_ylabel("Loss")
-#     plt.legend()
-#     plt.savefig("loss_curves.png")
-#     save_name = "plot1_" +str(i) + ".png"
-#     plt.savefig(save_name)
-#     return 
-# def plotting_2(train_forecast,Y_train,test_forecast,Y_test,i):
-#     fig, (ax1,ax2) = plt.subplots(1,2,figsize=(12,6),sharey=True)
-#     ax1.plot(train_forecast,np.squeeze(Y_train),"+k")
-#     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-#     ax1.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
-#     ax1.set_ylabel("Label")
-#     ax1.set_xlabel("Prediction")
-#     ax1.set_title("Train")
-#     ax1.grid(axis="x")
-#     ax1.grid(axis="y")
-#     ax2.plot(test_forecast,np.squeeze(Y_test),"+k")
-#     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-#     ax2.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
-#     ax2.set_xlabel("Prediction")
-#     ax2.set_title("Test")
-#     ax2.grid(axis="x")
-#     ax2.grid(axis="y")
-#     plt.suptitle('SubSet -->{}'.format(i+1), fontsize=20)
-#     save_name = "plot2_" +str(i) + ".png"
-#     plt.savefig(save_name)
-#     return 
-# def plotting_3(train_forecast,Y_train,test_forecast,Y_test,i, r):
-#     massimo = max(np.max(Y_train),np.max(train_forecast),np.max(Y_test),np.max(test_forecast))
-#     minimo = min(np.min(Y_train),np.min(train_forecast),np.min(Y_test),np.min(test_forecast))
-
-#     diff_train = np.abs(Y_train - train_forecast)
-#     diff_test = np.abs(Y_test - test_forecast)
-#     RMS_train = np.sqrt(np.mean(Y_train**2))
-#     RMSE_train = np.sqrt(np.mean((diff_train)**2))
-#     RMS_test = np.sqrt(np.mean(Y_test**2))
-#     RMSE_test = np.sqrt(np.mean((diff_test)**2))
-
-#     fig, (ax1,ax2,ax3,ax4) = plt.subplots(4,figsize=(16,6))
-#     ax1.plot(np.squeeze(Y_train[:r]),"r",label= "Label")
-#     ax1.plot(train_forecast[:r],"k",label= "Prediction")
-#     ax1.plot(RMS_train, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_train, precision=2)))
-#     ax1.plot(RMSE_train, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_train, precision=2)))
-#     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-#     ax1.set_ylabel("Centroid")
-#     ax1.set_title("Train")
-#     ax1.grid(axis="x")
-#     ax1.grid(axis="y")
-#     ax1.set_ylim((minimo, massimo))
-#     ax1.legend()
-#     ax2.plot(np.squeeze(Y_train[:r]) - train_forecast[:r], "b", label= "Label - Prediction")
-#     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-#     ax2.set_ylabel("Label - Prediction")
-#     ax2.set_xlabel("Time")
-#     ax2.grid(axis="x")
-#     ax2.grid(axis="y")
-#     ax2.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2))
-#     ax3.plot(np.squeeze(Y_test[:r]),"r",label= "Label")
-#     ax3.plot(test_forecast[:r],"k",label= "Prediction")
-#     ax3.plot(RMS_test, color='g', linestyle='-',label= "RMS:{}".format(np.format_float_scientific(RMS_test, precision=2)))
-#     ax3.plot(RMSE_test, color='m', linestyle='-',label= "RMSE:{}".format(np.format_float_scientific(RMSE_test, precision=2)))
-#     ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
-#     ax3.set_ylabel("Centroid")
-#     ax3.set_xlabel("Time")
-#     ax3.set_title("Test")
-#     ax3.grid(axis="x")
-#     ax3.grid(axis="y")
-#     ax3.set_ylim((minimo, massimo))
-#     ax3.legend()
-#     ax4.plot(np.squeeze(Y_test[:r]) - test_forecast[:r], "b", label= "Label - Prediction")
-#     ax4.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-#     ax4.set_ylabel("|Label - Prediction|")
-#     ax4.set_xlabel("Time")
-#     ax4.grid(axis="x")
-#     ax4.grid(axis="y")
-#     ax4.set_ylim((-(massimo-minimo)/2, (massimo-minimo)/2)) 
-#     save_name = "plot3_" +str(i) + ".png"
-#     plt.savefig(save_name)
-#     return 
-# def plotting_4(train_forecast,Y_train,test_forecast,Y_test,i):
-#     Y_train = np.squeeze(Y_train)
-#     Y_test = np.squeeze(Y_test)
-#     start = 0
-#     stop = 60
-#     Rolling_Y_train = []
-#     Rolling_train_forecast =[]
-#     for j in range(0,len(Y_train)-60):
-#         Rolling_Y_train.append(np.std(Y_train[start:stop]))
-#         Rolling_train_forecast.append(np.std(Y_train[start:stop] - train_forecast[start:stop]))
-#         start += 1
-#         stop += 1
-#     Rmean_Y_train = np.mean(Rolling_Y_train)
-#     Rmean_train_forecast = np.mean(Rolling_train_forecast)
-#     start = 0
-#     stop = 60
-#     Rolling_Y_test = []
-#     Rolling_test_forecast = []
-#     for j in range(0,len(Y_test)-60):
-#         Rolling_Y_test.append(np.std(Y_test[start:stop]))
-#         Rolling_test_forecast.append(np.std(Y_test[start:stop] - test_forecast[start:stop]))
-#         start += 1
-#         stop += 1
-#     Rmean_Y_test = np.mean(Rolling_Y_test)
-#     Rmean_test_forecast = np.mean(Rolling_test_forecast)
-#     fig, (ax1,ax2) = plt.subplots(2,figsize=(16,6))
-#     ax1.plot(Rolling_Y_train,"r",label= "Rolling STD -- Mean:{}".format(np.format_float_scientific(Rmean_Y_train, precision=2)))
-#     ax1.plot(Rolling_train_forecast,"k",label= "Rolling STD (Label - Prediction) -- Mean:{}".format(np.format_float_scientific(Rmean_train_forecast, precision=2)))
-#     ax1.hlines(y=np.std(Y_train), xmin=0, xmax=len(Rolling_Y_train), color='orange', label= "STD :{}".format(np.format_float_scientific(np.std(Y_train), precision=2)))
-#     ax1.hlines(y=np.std(Y_train - train_forecast), xmin=0, xmax=len(Rolling_train_forecast), color='gray', label= "STD  (Label - Prediction):{}".format(np.format_float_scientific(np.std(Y_train - train_forecast), precision=2)))
-#     ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-#     ax1.set_ylabel("STD")
-#     ax1.set_title("TRAIN")
-#     ax1.grid(axis="x")
-#     ax1.grid(axis="y")
-#     ax1.legend()
-#     ax2.plot(Rolling_Y_test,"r",label= "Rolling STD  -- Mean:{}".format(np.format_float_scientific(Rmean_Y_test, precision=2)))
-#     ax2.plot(Rolling_test_forecast,"k",label= "Rolling STD  (Label - Prediction) -- Mean:{}".format(np.format_float_scientific(Rmean_test_forecast, precision=2)))
-#     ax2.hlines(y=np.std(Y_test), xmin=0, xmax=len(Rolling_Y_test), color='orange', label= "STD :{}".format(np.format_float_scientific(np.std(Y_test), precision=2)))
-#     ax2.hlines(y=np.std(Y_test - test_forecast), xmin=0, xmax=len(Rolling_test_forecast), color='grey', label= "STD  (Label - Prediction):{}".format(np.format_float_scientific(np.std(Y_test - test_forecast), precision=2)))
-#     ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
-#     ax2.set_ylabel("STD")
-#     ax2.set_title("TEST")
-#     ax2.grid(axis="x")
-#     ax2.grid(axis="y")
-#     ax2.set_xlabel("Acq point)")
-#     ax2.legend()
-#     save_name = "plot4_" +str(i) + ".png"
-#     plt.savefig(save_name)
-#     return 

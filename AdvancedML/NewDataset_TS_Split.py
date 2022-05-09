@@ -19,12 +19,18 @@ from sklearn.linear_model import SGDRegressor
 import click
 import random
 from numpy.random import seed
+from statsmodels.tsa.seasonal import seasonal_decompose
+from tensorflow.keras.callbacks  import ReduceLROnPlateau
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.pipeline import Pipeline
+
 
 def clrscr():
     click.clear()
 def _check_keys(dict_value):
     """
-    checks if entries in dictionary are mat-objects. If yes
+    checks if entries in dictionary are matobjects. If yes
     todict is called to change them to nested dictionaries
     """
     for key in dict_value:
@@ -55,9 +61,9 @@ def loadmat(filename):
 
 def to_dataframe(dictionary):
     full_data = dictionary["syncData"]
-    
+
     x_Laser = full_data["LCam1_Gauss"][:,0]
-    
+
     xRMS_Laser = full_data["LCam1_Gauss"][:,1]
     y_Laser = full_data["LCam1_Gauss"][:,2]
     yRMS_Laser = full_data["LCam1_Gauss"][:,3]
@@ -68,15 +74,15 @@ def to_dataframe(dictionary):
     sum_Laser = full_data["LCam1_Gauss"][:,8]
     rf_amp = full_data["Cav_Amp"]
     rf_phs = full_data["Cav_Phs"]
-    fw2_amp =full_data["Fwd2_Amp"] 
-    fw2_phs =full_data["Fwd2_Phs"] 
+    fw2_amp =full_data["Fwd2_Amp"]
+    fw2_phs =full_data["Fwd2_Phs"]
     rv_amp = full_data["Rev_Amp"]
     rv_phs = full_data["Rev_Phs"]
     fw1_amp = full_data["Fwd1_Amp"]
     fw1_phs = full_data["Fwd1_Phs"]
     laser_amp = full_data["LP_Amp"]
     laser_phs = full_data["LP_Phase"]
-    
+
     cam = full_data["AdjUCam1Pos"]
     return  x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam
 
@@ -137,40 +143,39 @@ def denormalization(forecast, Y, norm_params, normalization_method):
 def windows_preprocessing_Antonio(time_series, past_history):
     x, y = [], []
     camera_series = time_series[0].copy()
-    #time_series = time_series[1:] # This line removes cam from the X
+    time_series = time_series[1:] # This line removes cam from the X
     for j in range(past_history, time_series.shape[1]):
         indices = list(range(j - past_history, j+1))
-        
+
         window_ts = time_series[:, indices].copy()
-        window_ts[0,-1] = np.mean(window_ts[0,:-1]) # Remove the value of the cam to be guessed
-        #random.uniform(min(window_ts[0,:-1]), max(window_ts[0,:-1])) #window_ts[0, -2] #0 #np.mean(window_ts[0,:-1]) # 
+        #window_ts[0,-1] = np.mean(window_ts[0,:-1]) # Remove the value of the cam to be guessed -- #random.uniform(min(window_ts[0,:-1]), max(window_ts[0,:-1])) #window_ts[0, -2] #0 #np.mean(window_ts[0,:-1]) #
         window = np.array(window_ts).transpose((1,0))
         x.append(window)
-        
+
         y.append(camera_series[j: j + 1])
     return np.array(x), np.array(y)
 
 def testing(X_test, past_history, model):
     test_forecast = []
-    #lastguess = 0
+    lastguess = 0
+    X_test = X_test[1:]  # This line removes cam from the X
     X_test_copy = X_test.copy()
-    lastguess = np.mean(X_test_copy[0, :past_history-1]) # Remove the value of the cam to be guessed
-    #random.uniform(min(X_test_copy[0,:past_history]), max(X_test_copy[0,:past_history])) , max(X_test_copy[0, :])) #X_test_copy[0, past_history-1] #0 #np.mean(X_test_copy[0, :past_history-1])
-    for k in range(past_history, np.shape(X_test)[1]):        
+    #lastguess = np.mean(X_test_copy[0, :past_history-1]) # Remove the value of the cam to be guessed -- random.uniform(min(X_test_copy[0,:past_history]), max(X_test_copy[0,:past_history])) , max(X_test_copy[0, :])) #X_test_copy[0, past_history-1] #0 #np.mean(X_test_copy[0, :past_history-1])
+    for k in range(past_history, np.shape(X_test)[1]):
         indices = list(range(k - past_history, k+1))
-        
-        X_test_copy[0,indices[-1]] = lastguess
+
+        #X_test_copy[0,indices[-1]] = lastguess
         X_test_new = X_test_copy[:, indices].copy()
-        #X_test_new[0,-1] = lastguess 
+        
         X_test_new = np.array(X_test_new).transpose((1,0))
-        #X_test_new = X_test_new.reshape(1,-1) #MLP - LR 
-        X_test_new = X_test_new.reshape(1,*np.shape(X_test_new)) # LST
+        X_test_new = X_test_new.reshape(1,-1) #MLP - LR
+        #X_test_new = X_test_new.reshape(1,*np.shape(X_test_new)) # LST - CNN
         lastguess = model.predict(X_test_new).flatten()[0]
         test_forecast.append(lastguess)
     return np.array(test_forecast)
 
 def root_mean_squared_error(y_true, y_pred):
-    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1)) 
+    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
 def lstm():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
     x = tf.keras.layers.LSTM(units=16, return_sequences=False)(inputs)
@@ -184,108 +189,174 @@ def lstm():
     return model
 def cnn():
     inputs = tf.keras.layers.Input(shape=np.shape(X_train)[-2:])
-    x = tf.keras.layers.Conv1D(128, 3, activation="linear", padding="same")(inputs)
+    x = tf.keras.layers.Conv1D(10, 3, activation="tanh", padding="same")(inputs)
     x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.MaxPool1D(pool_size=2)(x)    
+    x = tf.keras.layers.MaxPool1D(pool_size=2)(x)
     x = tf.keras.layers.Flatten()(inputs)
-    x = tf.keras.layers.Dense(148, activation='linear')(x)
+    x = tf.keras.layers.Dense(10, activation='tanh')(x)
     x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(128, activation='linear')(x)
+    # x = tf.keras.layers.Dense(128, activation='tanh')(x)
     # x = tf.keras.layers.Dropout(0.1)(x)
     # x = tf.keras.layers.BatchNormalization()(x)
-    # x = tf.keras.layers.Dense(32, activation='linear')(x)
-    # x = tf.keras.layers.Dropout(0.1)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
+    # x = tf.keras.layers.Dense(32, activation='tanh')(x)
+    x = tf.keras.layers.Dropout(0.1)(x)
+    # x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.Dense(1)(x)
+    model = tf.keras.Model(inputs=inputs, outputs=x)
+    return model
+def mlp():
+    inputs = tf.keras.layers.Input(shape=np.shape(X_train)[1:])
+    x = tf.keras.layers.Dense(64, activation="sigmoid")(inputs)
+    x = tf.keras.layers.Dense(32, activation='sigmoid')(x)
     x = tf.keras.layers.Dense(1)(x)
     model = tf.keras.Model(inputs=inputs, outputs=x)
     return model
 
-def plotting_1(y_train,train_forecast,y_test, test_forecast, l): 
+def plotting_1(y_train,train_forecast,y_test, test_forecast, l):
     if (l==0):
         len1 = len(y_train)
         len2 = len(train_forecast)
     else:
         len1 = l
-        len2 = l   
+        len2 = l
     fig, (ax1, ax2) = plt.subplots(2, figsize=(16,6))
     ax1.plot(y_train[:len1],'b',label="Label")
     ax1.plot(train_forecast[:len1],'r', label="Prediction")
     ax1.set_title('Train')
     ax1.set_xlabel('N sample')
     ax1.set_ylabel('Centroid [pixel]')
-    
-    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax1.legend()
     ax2.plot(y_test[:len2],'b',label="Label")
     ax2.plot(test_forecast[:len2],'r', label="Prediction")
     ax2.set_title('Test')
     ax2.set_xlabel('N sample')
     ax2.set_ylabel('Centroid [pixel]')
-    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))   
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
     ax2.legend()
     ax2.set_xlabel('N sample')
     ax2.set_ylabel('Centroid [pixel]')
     plt.tight_layout()
-    plt.savefig("NewDataset_TS_Train_Test.png")
+    plt.savefig("NewDataset_TS_Train_Test_Split.png")
     plt.show()
     return
 
+def plotting_component(data, decomposition):
+    trend    = decomposition.trend
+    seasonal = decomposition.seasonal
+    residual = decomposition.resid
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, sharex=True, figsize=(16,6))
+    ax1.plot(data, 'tab:blue')
+    ax1.set_title('Original Data set')
+    ax1.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax2.plot(trend, 'tab:orange')
+    ax2.set_title('Trend')
+    ax2.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax3.plot(seasonal, 'tab:green')
+    ax3.set_title('Seasonal')
+    ax3.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    ax4.plot(residual, 'tab:red')
+    ax4.set_title('Residual')
+    ax4.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+    plt.tight_layout()
+    plt.savefig("0_Component_TS_Split.png")
+    plt.show()
+    return
 
 if __name__ == "__main__":
     clrscr()
     t = time.time()
-    
+
     seed(1)
     tf.random.set_seed(2)
-    
-    past_history = 10
+
+    past_history = 35
     normalization_method = 'zscore'
     #"zscore", "minmax",
     fetureSelection = 0
+    periodicity = 100
 
-    #filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
-    filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
-    
+    filname = "new_dataset/Fourth_Dataset/OpenLoop1postp.mat" #-->OpenLoop
+    #filname = "new_dataset/Fourth_Dataset/ClosedLoop1postp.mat" #-->CloseLoop
+
     dict_all = loadmat(filname)
-    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict_all) 
-    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam  = x_Laser[:-500], xRMS_Laser[:-500], y_Laser[:-500], yRMS_Laser[:-500], u_Laser[:-500], uRMS_Laser[:-500], v_Laser[:-500], vRMS_Laser[:-500], sum_Laser[:-500], rf_amp[:-500], rf_phs[:-500], fw2_amp[:-500], fw2_phs[:-500], rv_amp[:-500], rv_phs[:-500], fw1_amp[:-500], fw1_phs[:-500], laser_amp[:-500], laser_phs[:-500], cam[:-500] 
-    
+    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam = to_dataframe(dict_all)
+    x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs, cam  = x_Laser[:-500], xRMS_Laser[:-500], y_Laser[:-500], yRMS_Laser[:-500], u_Laser[:-500], uRMS_Laser[:-500], v_Laser[:-500], vRMS_Laser[:-500], sum_Laser[:-500], rf_amp[:-500], rf_phs[:-500], fw2_amp[:-500], fw2_phs[:-500], rv_amp[:-500], rv_phs[:-500], fw1_amp[:-500], fw1_phs[:-500], laser_amp[:-500], laser_phs[:-500], cam[:-500]
+
+    ind = np.arange(0, len(cam))
+    cam_panda = pd.DataFrame({'data': cam}, index=ind)
+    decomposition = seasonal_decompose(cam_panda, model='additive', freq= periodicity)
+    plotting_component(cam, decomposition)
+    trend    = decomposition.trend
+    cam = trend.to_numpy()
+
+    if (periodicity!=0):
+        cam = cam[periodicity//2:-periodicity//2]
+        x_Laser = x_Laser[periodicity//2:-periodicity//2]
+        xRMS_Laser = xRMS_Laser[periodicity//2:-periodicity//2]
+        y_Laser = y_Laser[periodicity//2:-periodicity//2]
+        yRMS_Laser = yRMS_Laser[periodicity//2:-periodicity//2]
+        u_Laser = u_Laser[periodicity//2:-periodicity//2]
+        uRMS_Laser = uRMS_Laser[periodicity//2:-periodicity//2]
+        v_Laser = v_Laser[periodicity//2:-periodicity//2]
+        vRMS_Laser = vRMS_Laser[periodicity//2:-periodicity//2]
+        sum_Laser = sum_Laser[periodicity//2:-periodicity//2]
+        rf_amp = rf_amp[periodicity//2:-periodicity//2]
+        rf_phs = rf_phs[periodicity//2:-periodicity//2]
+        fw2_amp = fw2_amp[periodicity//2:-periodicity//2]
+        fw2_phs = fw2_phs[periodicity//2:-periodicity//2]
+        rv_amp = rv_amp[periodicity//2:-periodicity//2]
+        rv_phs = rv_phs[periodicity//2:-periodicity//2]
+        fw1_amp = fw1_amp[periodicity//2:-periodicity//2]
+        fw1_phs = fw1_phs[periodicity//2:-periodicity//2]
+        laser_amp = laser_amp[periodicity//2:-periodicity//2]
+        laser_phs  = laser_phs[periodicity//2:-periodicity//2]
+
     if fetureSelection:
-        FullDataset = np.array([cam, y_Laser, u_Laser, v_Laser, rf_amp, fw2_amp, rv_amp, rv_phs, fw1_phs, laser_amp]) 
+        FullDataset = np.array([cam, y_Laser, u_Laser, v_Laser, rf_amp, fw2_amp, rv_amp, rv_phs, fw1_phs, laser_amp])
     else:
-        FullDataset = np.array([cam, x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs])    
+        FullDataset = np.array([cam, x_Laser, xRMS_Laser, y_Laser, yRMS_Laser, u_Laser, uRMS_Laser, v_Laser, vRMS_Laser, sum_Laser, rf_amp, rf_phs, fw2_amp, fw2_phs, rv_amp, rv_phs, fw1_amp, fw1_phs, laser_amp, laser_phs])
+
 
     start_train = 0
     stop_train = int(len(cam)*0.8)
     print("Train start--stop:",start_train,"--",stop_train-1)
     print("Test start--stop:",stop_train,"--",len(cam))
     print("")
-    
+
     train, test = FullDataset[:,start_train:stop_train], FullDataset[:,stop_train:]
     train, test, norm_params = normalize_dataset(train, test, normalization_method, dtype="float64")
-    
+
     #Only TRAIN
     X_train, Y_train = windows_preprocessing_Antonio(train, past_history)
     # FOR Sklearn
-    #X_train= X_train.reshape(X_train.shape[0], -1)
-    #model = MLPRegressor(hidden_layer_sizes=(148), solver='adam',  learning_rate='constant', learning_rate_init=0.01,  
-    #                     activation="identity" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True, 
-    #                     validation_fraction=0.1, n_iter_no_change=30, verbose=1).fit(X_train, Y_train)    
+    X_train= X_train.reshape(X_train.shape[0], -1)
+    #model = MLPRegressor(hidden_layer_sizes=(148,64,32,16), solver='adam',  learning_rate='constant', learning_rate_init=0.01,
+    #                     activation="identity" ,random_state=42, max_iter=2000, shuffle=True, early_stopping=True,
+    #                     validation_fraction=0.1, n_iter_no_change=30, verbose=1).fit(X_train, Y_train)
     #model = LinearRegression().fit(X_train, Y_train)
-    
-    model = lstm()
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001), loss="mse")  
-    callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=50) 
-    history = model.fit(X_train, Y_train, batch_size=64, epochs=500, validation_split=(0.1), shuffle=True)
+    #model = RandomForestRegressor().fit(X_train, Y_train)
+    # model = Pipeline([('poly', PolynomialFeatures(degree=3)),
+    #                   ('linear', LinearRegression(fit_intercept=False))])
     
     
-    train_forecast = model.predict(X_train)    
+    # model = model.fit(X_train[:, np.newaxis], Y_train)
+    # model.named_steps['linear'].coef_
+
+    model = mlp()
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001), loss="mse")
+    early_stopping = EarlyStopping(monitor='val_loss',  mode='min', patience=10)
+    #reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=0.0000001, verbose=1)
+    history = model.fit(X_train, Y_train, batch_size=len(Y_train), epochs=30000, validation_split=(0.1), shuffle=False, callbacks=[early_stopping])
+
+    train_forecast = model.predict(X_train)
     train_forecast, Y_train_denorm= denormalization(train_forecast, Y_train, norm_params, normalization_method)
     std_data_train = np.std(Y_train_denorm)
     rms_train = np.sqrt(np.mean(Y_train_denorm**2))
-    std_train = np.std(Y_train_denorm-train_forecast)    
+    std_train = np.std(Y_train_denorm-train_forecast)
     rmse_train = mean_squared_error(Y_train_denorm, train_forecast, squared=False)
-    
+
     print("")
     print("-------------------------------------- TRAIN --------------------------------------")
     print("STD (Lable)  ---------------------------------------------------->",round(std_data_train, 3))
@@ -296,23 +367,23 @@ if __name__ == "__main__":
     print("-----------------------------------------------------------------------------------")
     print("")
     print("")
-    
+
     Y_test = test[0,past_history:]
-    test_forecast = testing(test, past_history, model)     
-    test_forecast, Y_test_denorm= denormalization(test_forecast, Y_test, norm_params, normalization_method)    
-    
+    test_forecast = testing(test, past_history, model)
+    test_forecast, Y_test_denorm= denormalization(test_forecast, Y_test, norm_params, normalization_method)
+
     std_data_test = np.std(Y_test_denorm)
     rms_test = np.sqrt(np.mean(Y_test_denorm**2))
-    std_test = np.std(Y_test_denorm-test_forecast)       
+    std_test = np.std(Y_test_denorm-test_forecast)
     rmse_test = mean_squared_error(Y_test_denorm, test_forecast, squared=False)
-    
+
     print("--------------------------------------- TEST ---------------------------------------")
     print("STD (Lable)  ---------------------------------------------------->",round(std_data_test, 3))
     print("RMS  ----------------------------------------------------------->",round(rms_test, 3))
     print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("STD (Lable - Prediction)  --------------------------------------->",round(std_test, 3))
     print("RMSE ------------------------------------------------------------>",round(rmse_test, 3))
-    print("-----------------------------------------------------------------------------------") 
+    print("-----------------------------------------------------------------------------------")
 
     plotting_1(Y_train_denorm,train_forecast, Y_test_denorm, test_forecast, l=0)
     elapsed = time.time() - t
